@@ -43,8 +43,9 @@ Versionning:
 ![screenshot](Docs/history2.png)
 
 
-User manamgenet:
-![screenshot](Docs/usermanamgement.png)
+User management:
+
+![screenshot](Docs/usermanagement.png)
 
 ---
 
