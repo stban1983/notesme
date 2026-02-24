@@ -1,0 +1,19 @@
+{
+    "name": "NotesMe",
+    "short_name": "NotesMe",
+    "description": "Self-hosted note-taking application",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#365390",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/static/logo.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["productivity", "utilities"]
+}

@@ -1,0 +1,11 @@
+services:
+  notes:
+    build: .
+    container_name: notesme
+    restart: unless-stopped
+    ports:
+      - "6807:8080"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
