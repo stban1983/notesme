@@ -2,12 +2,6 @@
 
 Self-hosted note-taking app — lightweight, encrypted, deployable in one command. Zero frontend dependencies, end-to-end encryption at rest, built for speed.
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
-
 I spent a long time looking for a simple, self-hosted note-taking application. I tested several, but I was never satisfied:
 either too advanced, with too many features,
 or too simplistic, lacking folder management, backups, etc.
@@ -17,6 +11,17 @@ I'm happy with it, and I hope it will be useful to others.
 I think its main strengths are its simplicity, its lightweight design, and its note versioning system.
 
 Read on for all the details and features!
+
+
+![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+Some Screenshots:
+
+![screenshot](Docs/lightmode.png)
 
 ---
 
