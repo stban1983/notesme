@@ -1,4 +1,5 @@
-# 📝 NotesMe
+![screenshot](Docs/logo.png)
+#  NotesMe
 
 Self-hosted note-taking app — lightweight, encrypted, deployable in one command. Zero frontend dependencies, end-to-end encryption at rest, built for speed.
 
@@ -21,7 +22,29 @@ Read on for all the details and features!
 
 Some Screenshots:
 
+Login:
+
+![screenshot](Docs/login.png)
+
+Home:
+
 ![screenshot](Docs/lightmode.png)
+
+Darkmode:
+
+![screenshot](Docs/darkmode.png)
+
+Exporting to txt or .html:
+
+![screenshot](Docs/history.png)
+
+Versionning:
+
+![screenshot](Docs/history2.png)
+
+
+User manamgenet:
+![screenshot](Docs/usermanamgement.png)
 
 ---
 
