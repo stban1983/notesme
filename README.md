@@ -113,6 +113,22 @@ nano .env
 docker compose up -d
 ```
 
+Or docker compose:
+
+```
+services:
+  notes:
+    build: .
+    container_name: notesme
+    restart: unless-stopped
+    ports:
+      - "6807:8080"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+```
+
 The app is available at `http://localhost:6807`.
 
 ### Generate an encryption key
