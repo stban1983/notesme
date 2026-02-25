@@ -1,16 +1,16 @@
 name: Build and Push multi-arch Docker Image
 
-# Déclencheur : s'exécute à chaque "push" sur la branche "main"
 on:
   push:
     branches:
-      - main # (Remplace par "master" si c'est le nom de ta branche principale)
+      - main
+    tags:
+      - 'v*.*.*' # Se déclenche aussi quand tu crées un tag Git (ex: v1.0.0)
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     
-    # Donne les droits à GitHub Actions d'écrire sur tes Packages (GHCR)
     permissions:
       contents: read
       packages: write
@@ -19,7 +19,7 @@ jobs:
       - name: Récupérer le code source
         uses: actions/checkout@v4
 
-      - name: Configurer QEMU (Pour l'émulation ARM64)
+      - name: Configurer QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Configurer Docker Buildx
@@ -30,7 +30,18 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # GitHub génère ça tout seul !
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- NOUVELLE ÉTAPE : Gestion automatique des tags ---
+      - name: Extraire les métadonnées (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/stban1983/notesme
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Construire et Pousser l'image (AMD64 & ARM64)
         uses: docker/build-push-action@v5
@@ -38,4 +49,6 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/stban1983/notesme:latest
+          # On utilise les tags générés par l'étape précédente
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
