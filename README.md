@@ -96,6 +96,8 @@ User management:
 
 ### Installation
 
+#### One line command:
+
 ```bash
 
 # 1. Create the environment file
@@ -112,7 +114,7 @@ vim .env
 docker run -d -p 8080:8080 -v ./:/app/data ghcr.io/stban1983/notesme:latest
 ```
 
-Or use docker compose:
+#### Or use docker compose:
 
 ```
 services:
