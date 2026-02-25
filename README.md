@@ -113,7 +113,7 @@ nano .env
 docker compose up -d
 ```
 
-Or docker compose:
+Or clone repo and use docker compose:
 
 ```
 services:
