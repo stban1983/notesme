@@ -1,12 +1,7 @@
-# 📝 NotesMe
+![screenshot](Docs/logo.png)
+#  NotesMe
 
 Self-hosted note-taking app — lightweight, encrypted, deployable in one command. Zero frontend dependencies, end-to-end encryption at rest, built for speed.
-
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 I spent a long time looking for a simple, self-hosted note-taking application. I tested several, but I was never satisfied:
 either too advanced, with too many features,
@@ -17,6 +12,40 @@ I'm happy with it, and I hope it will be useful to others.
 I think its main strengths are its simplicity, its lightweight design, and its note versioning system.
 
 Read on for all the details and features!
+
+
+![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+Some Screenshots:
+
+Login:
+
+![screenshot](Docs/login.png)
+
+Home:
+
+![screenshot](Docs/lightmode.png)
+
+Darkmode:
+
+![screenshot](Docs/darkmode.png)
+
+Exporting to txt or .html:
+
+![screenshot](Docs/history.png)
+
+Versionning:
+
+![screenshot](Docs/history2.png)
+
+
+User management:
+
+![screenshot](Docs/usermanagement.png)
 
 ---
 
@@ -82,6 +111,22 @@ nano .env
 
 # 4. Launch
 docker compose up -d
+```
+
+Or docker compose:
+
+```
+services:
+  notes:
+    build: .
+    container_name: notesme
+    restart: unless-stopped
+    ports:
+      - "6807:8080"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
 ```
 
 The app is available at `http://localhost:6807`.
