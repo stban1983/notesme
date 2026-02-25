@@ -510,10 +510,71 @@ async function showApp(username,admin){
     document.getElementById('userRole').textContent=isAdmin?'Administrator':'User';
     document.getElementById('adminBtn').style.display=isAdmin?'':'none';
     await loadFolders();await loadNotes();await loadStats();showEditorEmpty();
+
+    // ── Web Share Target: handle data shared from another Android app ──────────
+    // The SW intercepts POST /share-target and redirects here with query params.
+    // We consume them here, create a note, then clean the URL.
+    const sp = new URLSearchParams(location.search);
+    const shareTitle    = sp.get('share_title') || '';
+    const shareText     = sp.get('share_text')  || '';
+    const shareUrl      = sp.get('share_url')   || '';
+    const shareHasImage = sp.get('share_has_image') === '1';
+    if (shareTitle || shareText || shareUrl || shareHasImage) {
+        history.replaceState({ view: 'list' }, '', '/');
+        await handleShareTarget(shareTitle, shareText, shareUrl, shareHasImage);
+    }
 }
 async function init(){
     if(token){try{const u=await api('/auth/me');if(u){showApp(u.username,u.is_admin);return;}}catch{}}
     document.getElementById('loginOverlay').style.display='flex';
+}
+
+// ══════════════════════════════════════════
+// WEB SHARE TARGET
+// Handles content shared from other Android apps (text, links, images).
+// Called after login so the API is ready.
+// ══════════════════════════════════════════
+async function handleShareTarget(title, text, url, hasImage) {
+    try {
+        // Build note title: prefer explicit title, else first 60 chars of text
+        const noteTitle = title.trim() || (text.trim().substring(0, 60)) || (url ? 'Shared link' : 'Shared note');
+
+        // Build HTML content
+        let contentParts = [];
+        if (text.trim()) contentParts.push('<p>' + escHtml(text.trim()) + '</p>');
+        if (url.trim())  contentParts.push('<p><a href="' + escHtml(url.trim()) + '" target="_blank" rel="noopener">' + escHtml(url.trim()) + '</a></p>');
+        let noteContent  = contentParts.join('\n');
+
+        // Create the note
+        const note = await api('/notes', {
+            method: 'POST',
+            body: { title: noteTitle, content: noteContent, folder_id: null }
+        });
+        if (!note) return;
+
+        await loadNotes();
+        await loadStats();
+        await selectNote(note.id);
+
+        // If an image was shared, retrieve it from the SW cache and upload it
+        if (hasImage && 'caches' in window) {
+            try {
+                const imgCache = await caches.open('notes-share-img');
+                const imgResp  = await imgCache.match('/share-pending-image');
+                if (imgResp) {
+                    const blob = await imgResp.blob();
+                    const file = new File([blob], 'shared-image.' + (blob.type.split('/')[1] || 'jpg'), { type: blob.type });
+                    await imgCache.delete('/share-pending-image');
+                    await uploadImage(file);
+                }
+            } catch(e) { console.warn('Share image error:', e); }
+        }
+
+        toast('Shared content added as note');
+    } catch(e) {
+        console.error('Share target error:', e);
+        toast('Error importing shared content');
+    }
 }
 
 // ══════════════════════════════════════════
@@ -611,6 +672,12 @@ async function selectNote(id){
     updateWordCount();renderNotes();
     document.querySelectorAll('#editorContent img:not(.img-resize-wrapper img)').forEach(img=>wrapImageForResize(img));
     bindCheckboxes();autoLinkUrls();
+
+    // ── Android back: push a history entry so the back gesture closes the editor
+    // instead of exiting the app. Only on mobile (editor uses slide-in animation).
+    if(window.innerWidth <= 900){
+        history.pushState({ view: 'editor', noteId: id }, '', '/');
+    }
 }
 async function restoreNote(){
     if(!currentNote)return;
@@ -627,7 +694,20 @@ async function emptyTrash(){
     await api('/trash',{method:'DELETE'});await loadNotes();await loadStats();toast('Trash emptied');
 }
 function showEditorEmpty(){flushSave();document.getElementById('editorPanel').style.display='none';document.getElementById('editorEmpty').style.display='flex';currentNote=null;}
-function closeEditor(){flushSave();document.getElementById('editorPanel').classList.remove('open');currentNote=null;renderNotes();}
+
+// ── closeEditor: called by the explicit back-arrow button in the toolbar.
+// On mobile, we also navigate back in history so the stack stays in sync.
+function closeEditor(){
+    flushSave();
+    document.getElementById('editorPanel').classList.remove('open');
+    currentNote=null;
+    renderNotes();
+    if(window.innerWidth <= 900){
+        // Go back — this triggers popstate but the editor is already closed
+        // so the popstate handler does nothing extra.
+        history.back();
+    }
+}
 
 async function saveNote(){
     if(!currentNote||currentNote.deleted_at)return;
@@ -860,7 +940,8 @@ function selectFolder(id){
     document.querySelectorAll('.folder-item').forEach(el=>el.classList.toggle('active',el.dataset.folder===id));
     const names={'__all__':'All notes','__none__':'Uncategorized','__trash__':'Trash'};
     document.getElementById('currentFolderName').textContent=names[id]||(folders.find(f=>f.id===id)||{}).name||'Notes';
-    closeSidebar();loadNotes();showEditorEmpty();
+    closeSidebarUI();   // close sidebar on mobile without touching history (sidebar was opened → user taps folder → no history entry for sidebar)
+    loadNotes();showEditorEmpty();
 }
 function updateFolderSelect(){
     const s=document.getElementById('noteFolderSelect');
@@ -917,13 +998,79 @@ function showModal(title,label,value,confirmText,onConfirm){
 function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
 
 // ══════════════════════════════════════════
+// SIDEBAR — mobile open/close with history sync
+// ══════════════════════════════════════════
+
+// closeSidebarUI: pure UI — no history change.
+// Used internally by popstate handler and selectFolder.
+function closeSidebarUI(){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// openSidebar: opens sidebar and pushes a history entry on mobile.
+function openSidebar(){
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebarOverlay').classList.add('show');
+    if(window.innerWidth <= 900){
+        history.pushState({ view: 'sidebar' }, '', '/');
+    }
+}
+
+// closeSidebar: closes sidebar and pops history on mobile.
+// Called by the overlay click (onclick="closeSidebar()").
+function closeSidebar(){
+    const wasOpen = document.getElementById('sidebar').classList.contains('open');
+    closeSidebarUI();
+    if(wasOpen && window.innerWidth <= 900){
+        history.back();
+    }
+}
+
+// toggleSidebar: called by the hamburger button.
+function toggleSidebar(){
+    if(document.getElementById('sidebar').classList.contains('open')){
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+}
+
+// ══════════════════════════════════════════
+// ANDROID BACK GESTURE — popstate handler
+//
+// When Android's back gesture fires, the browser pops the history stack
+// and triggers popstate. We intercept it here:
+//  • Editor open → close editor (slide back to note list)
+//  • Sidebar open → close sidebar
+//  • Nothing open → let the browser handle it normally (exit / prev page)
+//
+// Important: we only update the UI here — never call history.back() again
+// (that would create an infinite loop). The history navigation already happened.
+// ══════════════════════════════════════════
+window.addEventListener('popstate', function() {
+    // Only intercept on mobile (editor uses slide animation)
+    if(window.innerWidth > 900) return;
+
+    if(document.getElementById('editorPanel').classList.contains('open')){
+        // Close editor — pure UI, no history navigation
+        document.getElementById('editorPanel').classList.remove('open');
+        currentNote = null;
+        renderNotes();
+    } else if(document.getElementById('sidebar').classList.contains('open')){
+        // Close sidebar — pure UI
+        closeSidebarUI();
+    }
+    // Nothing is open: do nothing — the browser will navigate as normal
+    // (back to previous real page, or close the PWA).
+});
+
+// ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
 let sT;document.getElementById('searchInput').addEventListener('input',()=>{clearTimeout(sT);sT=setTimeout(loadNotes,300);});
 function initTheme(){const s=localStorage.getItem('notes_theme');if(s)document.documentElement.dataset.theme=s;else document.documentElement.dataset.theme='dark';}
 document.getElementById('themeToggle').addEventListener('click',()=>{const n=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=n;localStorage.setItem('notes_theme',n);});
-function toggleSidebar(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');s.classList.toggle('open');o.classList.toggle('show',s.classList.contains('open'));}
-function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('show');}
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function formatDate(ds){if(!ds)return'';const d=new Date(ds),diff=Date.now()-d;if(diff<60000)return"Just now";if(diff<3600000)return Math.floor(diff/60000)+' min';if(diff<86400000)return Math.floor(diff/3600000)+'h';return d.toLocaleDateString('en-US',{day:'numeric',month:'short'});}
 function updateWordCount(){const t=document.getElementById('editorContent').textContent||'';const w=t.trim()?t.trim().split(/\s+/).length:0;document.getElementById('editorWordCount').textContent=w+' word'+(w!==1?'s':'');}
@@ -941,6 +1088,11 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&saveTimeou
 
 // PWA
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+
+// ── Initialize base history state ──────────────────────────────────────────
+// This ensures there is always a "list" state at the bottom of the stack
+// before any editor/sidebar states are pushed on mobile.
+history.replaceState({ view: 'list' }, '', location.pathname + location.search);
 
 initTheme();init();
 </script>
