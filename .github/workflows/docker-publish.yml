@@ -1,0 +1,41 @@
+name: Build and Push multi-arch Docker Image
+
+# Déclencheur : s'exécute à chaque "push" sur la branche "main"
+on:
+  push:
+    branches:
+      - main # (Remplace par "master" si c'est le nom de ta branche principale)
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    # Donne les droits à GitHub Actions d'écrire sur tes Packages (GHCR)
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer le code source
+        uses: actions/checkout@v4
+
+      - name: Configurer QEMU (Pour l'émulation ARM64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configurer Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # GitHub génère ça tout seul !
+
+      - name: Construire et Pousser l'image (AMD64 & ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/stban1983/notesme:latest
