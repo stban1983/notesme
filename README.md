@@ -97,28 +97,27 @@ User management:
 ### Installation
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/stban1983/notesme.git
-cd notesme
 
-# 2. Create the environment file
+# 1. Create the environment file
 cp .env.example .env
 
 # 3. Edit .env with your values
 #    - Set a strong password
 #    - Generate an encryption key (see below)
-nano .env
+vim .env
 
-# 4. Launch
-docker compose up -d
+# 4. Adapt the volume path
+
+# 5. Launch
+docker run -d -p 8080:8080 -v ./:/app/data ghcr.io/stban1983/notesme:latest
 ```
 
-Or clone repo and use docker compose:
+Or use docker compose:
 
 ```
 services:
-  notes:
-    build: .
+  notesme:
+    image: ghcr.io/stban1983/notesme:latest
     container_name: notesme
     restart: unless-stopped
     ports:
