@@ -44,7 +44,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Construire et Pousser l'image (AMD64 & ARM64)
+      - name: Construire et Pousser l'image (AMD64, ARM64 et Alpine)
         uses: docker/build-push-action@v5
         with:
           context: .
