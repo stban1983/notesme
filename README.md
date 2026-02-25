@@ -80,7 +80,7 @@ User management:
 - Each user has their own notes, folders and trash
 
 **Experience**
-- Installable PWA — works as a native app on mobile and desktop
+- Installable PWA — works as a native app on mobile and desktop, you can use "Share" button to share data with NotesMe!
 - Dark / light theme with automatic detection
 - Responsive interface
 - Vanilla JS — zero frameworks, instant load
