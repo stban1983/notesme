@@ -41,6 +41,7 @@ jobs:
           images: ghcr.io/stban1983/notesme
           tags: |
             type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 

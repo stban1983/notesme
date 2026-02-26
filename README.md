@@ -51,43 +51,47 @@ User management:
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-**Editor**
-- Rich WYSIWYG editor — bold, italic, underline, colors, headings, quotes, lists, code blocks
-- Interactive checklists with checkboxes
-- Drag & drop / paste images with visual resizing handles
-- Link insertion with URL auto-detection and `Ctrl+K` shortcut
-- Real-time autosave
+### 📱 PWA & Experience
 
-**Organization**
-- Folders and subfolders — unlimited nested hierarchy
-- Pin important notes to the top
-- Soft-delete trash with restore and configurable auto-purge
-- Automatic version history (snapshots every 5 min, up to 50 per note)
-- Export to plain text or HTML
+- Offline Mode (Read Only)
+- Installable as a native app on mobile and desktop (PWA)
+- Support share from another apps
+- Dark / light theme with automatic system detection
+- Fully responsive interface
+- Zero JavaScript frameworks — instant load times
+- Handy keyboard shortcuts: Ctrl+N, Ctrl+B/I/U, Ctrl+K, and more
 
-**Security**
-- AES encryption at rest (Fernet / AES-128-CBC + HMAC-SHA256)
-- Argon2id password hashing (OWASP recommendation)
-- In-memory search — decrypted text never touches the disk
-- HTML sanitization client-side (DOMPurify) and server-side
-- Path traversal, malicious upload and XSS protections
-- Login rate limiting
-- JWT authentication
+### 🗂️ Organization
 
-**Multi-user**
-- Admin user management panel
-- Full data isolation between users
-- Each user has their own notes, folders and trash
+- Unlimited nested folders and subfolders to structure your notes your way
+- Pin important notes to the top of the list
+- Soft-delete trash with one-click restore and configurable auto-purge
+- Automatic version history — snapshots every 5 minutes, up to 50 versions per note
+- Export any note to plain text (.txt) or HTML
 
-**Experience**
-- Installable PWA — works as a native app on mobile and desktop, you can use "Share" button to share data with NotesMe!
-- Offline mode (Read only)
-- Dark / light theme with automatic detection
-- Responsive interface
-- Vanilla JS — zero frameworks, instant load
-- Keyboard shortcuts — `Ctrl+N` (new note), `Ctrl+B/I/U`, `Ctrl+K` (link)
+### 📝 Rich Editor
+
+- Full WYSIWYG editing — bold, italic, underline, colors, headings, quotes, lists, code blocks
+- Interactive checklists with real-time checkbox support
+- Drag & drop or paste images directly into notes, with visual resizing handles
+- Link insertion with URL auto-detection and Ctrl+K shortcut
+- Real-time autosave — never lose your work
+
+### 🔒 Security
+
+- AES encryption at rest (Fernet / AES-128-CBC + HMAC-SHA256) — optional, enabled by setting an encryption key
+- Argon2id password hashing (OWASP 2024 recommendation)
+- In-memory full-text search — decrypted content never touches the disk
+- XSS protection via DOMPurify (client-side) and html.escape() (server-side)
+- Protection against path traversal, malicious file uploads, and brute-force attacks
+- JWT-based authentication with configurable session duration
+
+### 👥 Multi-user Support
+
+- Admin panel for user management
+- Full data isolation — each user's notes, folders, and trash are completely private
 
 ---
 
