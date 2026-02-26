@@ -11,6 +11,8 @@ So I decided to create this application myself, with Claude's help.
 I'm happy with it, and I hope it will be useful to others.
 I think its main strengths are its simplicity, its lightweight design, and its note versioning system.
 
+Secure - Simple - SelfHosted
+
 Read on for all the details and features!
 
 
@@ -81,6 +83,7 @@ User management:
 
 **Experience**
 - Installable PWA — works as a native app on mobile and desktop, you can use "Share" button to share data with NotesMe!
+- Offline mode (Read only)
 - Dark / light theme with automatic detection
 - Responsive interface
 - Vanilla JS — zero frameworks, instant load
@@ -92,7 +95,7 @@ User management:
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker or/and Docker Compose
 
 ### Installation
 
