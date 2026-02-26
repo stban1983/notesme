@@ -747,6 +747,70 @@ def get_image(filename: str):
         raise HTTPException(404)
     return FileResponse(real_path)
 
+# ─── Offline Sync ───
+@app.get("/api/sync")
+def sync_all(request: Request, user=Depends(get_current_user)):
+    """Return all user data (notes with decrypted content, folders, stats) in one payload
+    for offline caching.  Images referenced inside notes are NOT included (they use
+    their own cache-friendly URLs)."""
+    db = get_db()
+    uid = user["user_id"]
+
+    # ── Quick change detection: hash of latest updated_at to avoid useless full sync ──
+    latest = db.execute(
+        "SELECT MAX(updated_at) as m FROM notes WHERE user_id = ? AND deleted_at IS NULL", (uid,)
+    ).fetchone()
+    etag_source = (latest["m"] or "") + str(db.execute("SELECT COUNT(*) as c FROM notes WHERE user_id=?", (uid,)).fetchone()["c"])
+    etag = '"' + hashlib.md5(etag_source.encode()).hexdigest()[:16] + '"'
+    if_none_match = request.headers.get("If-None-Match", "")
+    if if_none_match == etag:
+        db.close()
+        return Response(status_code=304)
+
+    # Folders
+    folder_rows = db.execute(
+        "SELECT * FROM folders WHERE user_id = ? ORDER BY position, name", (uid,)
+    ).fetchall()
+    folders_out = [dict(f) for f in folder_rows]
+
+    # Notes (active only – trash is not synced offline)
+    note_rows = db.execute(
+        "SELECT id, title, content, folder_id, pinned, created_at, updated_at "
+        "FROM notes WHERE user_id = ? AND deleted_at IS NULL "
+        "ORDER BY pinned DESC, updated_at DESC",
+        (uid,)
+    ).fetchall()
+    notes_out = []
+    for r in note_rows:
+        d = dict(r)
+        d["content"] = decrypt_content(d["content"])
+        d["preview"] = strip_html(d["content"])[:200]
+        notes_out.append(d)
+
+    # Stats
+    nc = len(notes_out)
+    fc = len(folders_out)
+    tc = db.execute("SELECT COUNT(*) as c FROM notes WHERE user_id=? AND deleted_at IS NOT NULL", (uid,)).fetchone()["c"]
+    uc = sum(1 for n in notes_out if not n.get("folder_id"))
+    rows = db.execute(
+        "SELECT folder_id, COUNT(*) as c FROM notes WHERE user_id=? AND deleted_at IS NULL AND folder_id IS NOT NULL GROUP BY folder_id",
+        (uid,)
+    ).fetchall()
+    folder_counts = {r["folder_id"]: r["c"] for r in rows}
+
+    db.close()
+    payload = {
+        "notes": notes_out,
+        "folders": folders_out,
+        "stats": {"notes": nc, "folders": fc, "trash": tc, "unclassified": uc, "folder_counts": folder_counts},
+        "synced_at": datetime.now(timezone.utc).isoformat()
+    }
+    return Response(
+        content=json.dumps(payload),
+        media_type="application/json",
+        headers={"ETag": etag}
+    )
+
 # ─── Stats ───
 @app.get("/api/stats")
 def get_stats(user=Depends(get_current_user)):

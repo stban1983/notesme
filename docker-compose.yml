@@ -1,6 +1,6 @@
 services:
-  notes:
-    build: .
+  notesme:
+    image: ghcr.io/stban1983/notesme:latest
     container_name: notesme
     restart: unless-stopped
     ports:

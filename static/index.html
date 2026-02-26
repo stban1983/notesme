@@ -289,6 +289,14 @@
         }
         @media(min-width:901px){.mobile-back{display:none!important}.mobile-menu-btn{display:none!important}}
         .hidden{display:none!important}
+
+        /* ═══ OFFLINE BANNER ═══ */
+        .offline-banner{display:none;align-items:center;justify-content:center;gap:10px;padding:10px 20px;background:linear-gradient(135deg,rgba(255,212,59,0.12),rgba(255,107,107,0.08));border-bottom:1px solid rgba(255,212,59,0.25);font-size:13px;font-weight:600;color:var(--warning);z-index:50;animation:fadeIn .3s ease;position:fixed;top:0;left:0;right:0;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+        .offline-banner.show{display:flex}
+        .offline-banner .i{font-size:16px}
+        .offline-banner .offline-sync-info{font-size:11px;font-weight:400;color:var(--text-tertiary);margin-left:4px}
+        body.is-offline .app-layout{padding-top:40px}
+        .offline-readonly-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:rgba(255,212,59,0.15);color:var(--warning);margin-left:8px}
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
@@ -309,6 +317,11 @@
 
     <!-- ═══ APP ═══ -->
     <div id="app" class="app-layout hidden">
+        <div class="offline-banner" id="offlineBanner">
+            <span class="i"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23" stroke-width="2.5"/></svg></span>
+            Offline mode — read only
+            <span class="offline-sync-info" id="offlineSyncInfo"></span>
+        </div>
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -445,6 +458,227 @@
 let token = localStorage.getItem('notes_token');
 let folders=[], notes=[], currentFolder='__all__', currentNote=null, saveTimeout=null, contextTarget=null;
 let isAdmin=false, isTrashView=false, folderCounts={};
+let isOffline = !navigator.onLine;
+
+// ══════════════════════════════════════════
+// INDEXEDDB OFFLINE CACHE
+// ══════════════════════════════════════════
+const OfflineDB = {
+    _db: null,
+    DB_NAME: 'notesme_offline',
+    DB_VERSION: 1,
+
+    async open() {
+        if (this._db) return this._db;
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('notes')) db.createObjectStore('notes', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+            };
+            req.onsuccess = () => { this._db = req.result; resolve(this._db); };
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async saveSync(data) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['notes', 'folders', 'meta'], 'readwrite');
+            const noteStore = tx.objectStore('notes');
+            const folderStore = tx.objectStore('folders');
+            const metaStore = tx.objectStore('meta');
+
+            // Clear old data
+            noteStore.clear();
+            folderStore.clear();
+
+            // Save notes — pre-compute plaintext for fast offline search
+            for (const note of (data.notes || [])) {
+                note._plaintext = stripHtmlClient(note.content || '').toLowerCase();
+                noteStore.put(note);
+            }
+            // Save folders
+            for (const folder of (data.folders || [])) {
+                folderStore.put(folder);
+            }
+            // Save metadata (stats + sync timestamp)
+            metaStore.put({ key: 'stats', value: data.stats });
+            metaStore.put({ key: 'synced_at', value: data.synced_at });
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async getNotes() {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('notes', 'readonly');
+            const req = tx.objectStore('notes').getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getNote(id) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('notes', 'readonly');
+            const req = tx.objectStore('notes').get(id);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getFolders() {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('folders', 'readonly');
+            const req = tx.objectStore('folders').getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getMeta(key) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('meta', 'readonly');
+            const req = tx.objectStore('meta').get(key);
+            req.onsuccess = () => resolve(req.result ? req.result.value : null);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async clear() {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['notes', 'folders', 'meta'], 'readwrite');
+            tx.objectStore('notes').clear();
+            tx.objectStore('folders').clear();
+            tx.objectStore('meta').clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+};
+
+// ══════════════════════════════════════════
+// OFFLINE STATE
+// ══════════════════════════════════════════
+function setOfflineState(offline) {
+    isOffline = offline;
+    document.body.classList.toggle('is-offline', offline);
+    document.getElementById('offlineBanner').classList.toggle('show', offline);
+
+    // Update sync info
+    if (offline) {
+        OfflineDB.getMeta('synced_at').then(syncedAt => {
+            if (syncedAt) {
+                const d = new Date(syncedAt);
+                const dateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                document.getElementById('offlineSyncInfo').textContent = '(last sync: ' + dateStr + ')';
+            }
+        }).catch(() => {});
+
+        // Disable write UI elements
+        document.getElementById('newNoteBtn').style.display = 'none';
+        // If a note is open, make it read-only
+        if (currentNote) {
+            document.getElementById('editorContent').contentEditable = 'false';
+            document.getElementById('editorTitle').readOnly = true;
+            document.getElementById('formatBar').style.display = 'none';
+            document.getElementById('editorSaveStatus').textContent = '🔒 Read only';
+        }
+    } else {
+        document.getElementById('newNoteBtn').style.display = '';
+        if (currentNote && !currentNote.deleted_at) {
+            document.getElementById('editorContent').contentEditable = 'true';
+            document.getElementById('editorTitle').readOnly = false;
+            document.getElementById('formatBar').style.display = 'flex';
+            document.getElementById('editorSaveStatus').textContent = '✓ Saved';
+        }
+    }
+}
+
+// Sync data to IndexedDB for offline use
+let _syncEtag = null;
+async function syncOfflineData() {
+    if (isOffline || !token) return;
+    try {
+        const headers = { 'Authorization': 'Bearer ' + token };
+        if (_syncEtag) headers['If-None-Match'] = _syncEtag;
+        const res = await fetch('/api/sync', { headers });
+        if (res.status === 304) { console.log('[Offline] No changes since last sync'); return; }
+        if (!res.ok) return;
+        _syncEtag = res.headers.get('ETag') || null;
+        const data = await res.json();
+        if (data) {
+            await OfflineDB.saveSync(data);
+            console.log('[Offline] Sync complete:', data.notes.length, 'notes,', data.folders.length, 'folders');
+        }
+    } catch (e) {
+        console.warn('[Offline] Sync failed:', e);
+    }
+}
+
+// Listen for online/offline events
+window.addEventListener('online', () => {
+    setOfflineState(false);
+    toast('Back online');
+    // Re-sync data and reload
+    syncOfflineData().then(() => {
+        loadFolders(); loadNotes(); loadStats();
+    });
+});
+window.addEventListener('offline', () => {
+    setOfflineState(true);
+    toast('Offline — read only mode');
+});
+
+// ── Offline-aware note loading helpers ──
+async function offlineLoadNotes(folderId, search) {
+    let allNotes = await OfflineDB.getNotes();
+
+    // Filter
+    if (search) {
+        const q = search.toLowerCase();
+        allNotes = allNotes.filter(n => {
+            const title = (n.title || '').toLowerCase();
+            // Use pre-computed plaintext if available (avoids re-stripping HTML on every keystroke)
+            const text = n._plaintext || stripHtmlClient(n.content || '').toLowerCase();
+            return title.includes(q) || text.includes(q);
+        });
+    } else if (folderId === '__none__') {
+        allNotes = allNotes.filter(n => !n.folder_id);
+    } else if (folderId && folderId !== '__all__' && folderId !== '__trash__') {
+        allNotes = allNotes.filter(n => n.folder_id === folderId);
+    }
+
+    // Sort: pinned first, then by updated_at desc
+    allNotes.sort((a, b) => {
+        if ((b.pinned || 0) !== (a.pinned || 0)) return (b.pinned || 0) - (a.pinned || 0);
+        return (b.updated_at || '').localeCompare(a.updated_at || '');
+    });
+
+    // Return with preview
+    return allNotes.map(n => ({
+        ...n,
+        preview: stripHtmlClient(n.content || '').substring(0, 200)
+    }));
+}
+
+// Simple client-side HTML stripper (mirrors server's strip_html)
+function stripHtmlClient(html) {
+    if (!html) return '';
+    let text = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n').replace(/<\/h[1-6]>/gi, '\n');
+    text = text.replace(/<[^>]+>/g, '');
+    text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    return text.replace(/\n{3,}/g, '\n\n').trim();
+}
 
 // ══════════════════════════════════════════
 // LUCIDE ICON HELPER
@@ -476,6 +710,10 @@ function sanitize(html){
 // API
 // ══════════════════════════════════════════
 async function api(path, opts={}) {
+    if (isOffline && opts.method && opts.method !== 'GET') {
+        toast('Offline — read only');
+        return null;
+    }
     const h = {...opts.headers};
     if (token) h['Authorization']='Bearer '+token;
     if (opts.body && !(opts.body instanceof FormData)) { h['Content-Type']='application/json'; opts.body=JSON.stringify(opts.body); }
@@ -500,7 +738,15 @@ document.getElementById('loginForm').addEventListener('submit', async(e)=>{
         else{errEl.textContent='Invalid credentials';errEl.style.display='block';}
     }catch{errEl.textContent='Invalid credentials';errEl.style.display='block';}
 });
-function logout(){token=null;localStorage.removeItem('notes_token');location.reload();}
+function logout(){
+    token=null;localStorage.removeItem('notes_token');
+    // ── Security: purge all decrypted data from client storage ──
+    OfflineDB.clear().catch(()=>{});
+    if ('caches' in window) {
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(()=>{});
+    }
+    location.reload();
+}
 async function showApp(username,admin){
     document.getElementById('loginOverlay').style.display='none';
     document.getElementById('app').classList.remove('hidden');
@@ -509,11 +755,16 @@ async function showApp(username,admin){
     isAdmin=!!admin;
     document.getElementById('userRole').textContent=isAdmin?'Administrator':'User';
     document.getElementById('adminBtn').style.display=isAdmin?'':'none';
+
+    // Check offline state
+    setOfflineState(!navigator.onLine);
+
     await loadFolders();await loadNotes();await loadStats();showEditorEmpty();
 
-    // ── Web Share Target: handle data shared from another Android app ──────────
-    // The SW intercepts POST /share-target and redirects here with query params.
-    // We consume them here, create a note, then clean the URL.
+    // ── Sync data for offline use (non-blocking) ──
+    if (!isOffline) { syncOfflineData(); }
+
+    // ── Web Share Target ──
     const sp = new URLSearchParams(location.search);
     const shareTitle    = sp.get('share_title') || '';
     const shareText     = sp.get('share_text')  || '';
@@ -525,7 +776,41 @@ async function showApp(username,admin){
     }
 }
 async function init(){
-    if(token){try{const u=await api('/auth/me');if(u){showApp(u.username,u.is_admin);return;}}catch{}}
+    if(token){
+        try{
+            const u=await api('/auth/me');
+            if(u){showApp(u.username,u.is_admin);return;}
+        }catch{
+            // If we're offline and have a token, try to show the app in offline mode
+            if (!navigator.onLine) {
+                try {
+                    const hasCachedNotes = (await OfflineDB.getNotes()).length > 0;
+                    if (hasCachedNotes) {
+                        // Parse basic info from JWT token for display + verify expiry
+                        let username = 'User', adminFlag = false;
+                        try {
+                            const payload = JSON.parse(atob(token.split('.')[1]));
+                            // Security: reject expired tokens even offline
+                            if (payload.exp && (payload.exp * 1000) < Date.now()) {
+                                console.warn('[Offline] Token expired, clearing cache');
+                                await OfflineDB.clear();
+                                token = null; localStorage.removeItem('notes_token');
+                                throw new Error('Token expired');
+                            }
+                            username = payload.username || 'User';
+                            adminFlag = !!payload.is_admin;
+                        } catch (jwtErr) {
+                            if (jwtErr.message === 'Token expired') throw jwtErr;
+                            // Malformed token — don't allow offline access
+                            throw new Error('Invalid token');
+                        }
+                        showApp(username, adminFlag);
+                        return;
+                    }
+                } catch {}
+            }
+        }
+    }
     document.getElementById('loginOverlay').style.display='flex';
 }
 
@@ -580,7 +865,14 @@ async function handleShareTarget(title, text, url, hasImage) {
 // ══════════════════════════════════════════
 // FOLDERS
 // ══════════════════════════════════════════
-async function loadFolders(){folders=await api('/folders')||[];renderFolders();}
+async function loadFolders(){
+    if (isOffline) {
+        try { folders = await OfflineDB.getFolders() || []; } catch { folders = []; }
+    } else {
+        folders=await api('/folders')||[];
+    }
+    renderFolders();
+}
 function renderFolders(){
     const c=document.getElementById('foldersContainer');c.innerHTML='';
     const roots=folders.filter(f=>!f.parent_id);
@@ -599,7 +891,12 @@ function renderFolders(){
     roots.forEach(f=>rf(f));
 }
 async function loadStats(){
-    const s=await api('/stats');
+    let s;
+    if (isOffline) {
+        try { s = await OfflineDB.getMeta('stats'); } catch { s = null; }
+    } else {
+        s=await api('/stats');
+    }
     if(s){
         document.getElementById('allCount').textContent=s.notes;
         document.getElementById('trashCount').textContent=s.trash;
@@ -609,6 +906,7 @@ async function loadStats(){
     }
 }
 async function createFolder(parentId){
+    if(isOffline){toast('Offline — read only');return;}
     showModal('New folder','Folder name','','Create',async(name)=>{
         if(name.trim()){await api('/folders',{method:'POST',body:{name:name.trim(),parent_id:parentId||null}});await loadFolders();toast('Folder created');}
     });
@@ -619,8 +917,25 @@ async function createFolder(parentId){
 // ══════════════════════════════════════════
 async function loadNotes(){
     const search=document.getElementById('searchInput').value.trim();
-    let path='/notes';const params=new URLSearchParams();
     isTrashView=currentFolder==='__trash__';
+
+    if (isOffline) {
+        // Trash view not available offline
+        if (isTrashView) {
+            notes = [];
+            toast('Trash not available offline');
+        } else {
+            try {
+                notes = await offlineLoadNotes(currentFolder, search);
+            } catch { notes = []; }
+        }
+        renderNotes();
+        document.getElementById('trashBar').classList.toggle('hidden',!isTrashView);
+        document.getElementById('newNoteBtn').style.display='none';
+        return;
+    }
+
+    let path='/notes';const params=new URLSearchParams();
     if(isTrashView)params.set('trash','true');
     else if(search)params.set('search',search);
     else if(currentFolder==='__none__')params.set('folder_id','__none__');
@@ -642,6 +957,7 @@ function renderNotes(){
     }).join('');
 }
 async function createNote(){
+    if(isOffline){toast('Offline — read only');return;}
     const fid=currentFolder!=='__all__'&&currentFolder!=='__none__'&&currentFolder!=='__trash__'?currentFolder:null;
     const note=await api('/notes',{method:'POST',body:{title:'Untitled',content:'',folder_id:fid}});
     if(note){await loadNotes();await loadStats();selectNote(note.id);document.getElementById('editorTitle').focus();document.getElementById('editorTitle').select();}
@@ -651,46 +967,68 @@ async function flushSave(){
 }
 async function selectNote(id){
     await flushSave();
-    const note=await api('/notes/'+id);if(!note)return;
+    let note;
+    if (isOffline) {
+        try { note = await OfflineDB.getNote(id); } catch { note = null; }
+    } else {
+        note=await api('/notes/'+id);
+    }
+    if(!note)return;
     currentNote=note;
     document.getElementById('editorPanel').style.display='flex';
     document.getElementById('editorPanel').classList.add('open');
     document.getElementById('editorEmpty').style.display='none';
     document.getElementById('editorTitle').value=note.title;
     document.getElementById('editorContent').innerHTML=sanitize(note.content||'');
+
     document.getElementById('pinBtn').style.opacity=note.pinned?1:0.4;
     const isDeleted=!!note.deleted_at;
-    document.getElementById('editorContent').contentEditable=!isDeleted;
-    document.getElementById('editorTitle').readOnly=isDeleted;
-    document.getElementById('formatBar').style.display=isDeleted?'none':'flex';
+    const readOnly = isDeleted || isOffline;
+    document.getElementById('editorContent').contentEditable=!readOnly;
+    document.getElementById('editorTitle').readOnly=readOnly;
+    document.getElementById('formatBar').style.display=readOnly?'none':'flex';
+    if (isOffline) {
+        document.getElementById('editorSaveStatus').textContent='🔒 Read only';
+    }
     document.getElementById('editorToolbarTrash').innerHTML=isDeleted?
         '<button class="btn-icon" onclick="restoreNote()" style="color:var(--success)" title="Restore">'+icon('restore','18px')+'</button>'+
         '<button class="btn-icon" onclick="permanentDelete()" style="color:var(--danger)" title="Delete permanently">'+icon('trash','18px')+'</button>':'';
     updateFolderSelect();
     document.getElementById('noteFolderSelect').value=note.folder_id||'';
-    document.getElementById('noteFolderSelect').style.display=isDeleted?'none':'';
+    document.getElementById('noteFolderSelect').style.display=(isDeleted||isOffline)?'none':'';
+    // Hide action buttons that don't work offline
+    if (isOffline) {
+        document.getElementById('pinBtn').style.display='none';
+        document.querySelectorAll('.editor-toolbar-right .btn-icon').forEach(btn => {
+            // Keep only the back button, hide pin/image/export/version/delete
+            if (!btn.classList.contains('mobile-back')) {
+                // Only show export and versions (they may work from cache)
+            }
+        });
+    } else {
+        document.getElementById('pinBtn').style.display='';
+    }
     updateWordCount();renderNotes();
     document.querySelectorAll('#editorContent img:not(.img-resize-wrapper img)').forEach(img=>wrapImageForResize(img));
     bindCheckboxes();autoLinkUrls();
 
-    // ── Android back: push a history entry so the back gesture closes the editor
-    // instead of exiting the app. Only on mobile (editor uses slide-in animation).
+    // ── Android back: push a history entry
     if(window.innerWidth <= 900){
         history.pushState({ view: 'editor', noteId: id }, '', '/');
     }
 }
 async function restoreNote(){
-    if(!currentNote)return;
+    if(!currentNote||isOffline)return;
     await api('/notes/'+currentNote.id+'/restore',{method:'POST'});
     showEditorEmpty();await loadNotes();await loadStats();toast('Note restored');
 }
 async function permanentDelete(){
-    if(!currentNote||!confirm('Delete permanently?'))return;
+    if(!currentNote||isOffline||!confirm('Delete permanently?'))return;
     await api('/notes/'+currentNote.id+'?permanent=true',{method:'DELETE'});
     showEditorEmpty();await loadNotes();await loadStats();toast('Permanently deleted');
 }
 async function emptyTrash(){
-    if(!confirm('Empty trash?'))return;
+    if(isOffline||!confirm('Empty trash?'))return;
     await api('/trash',{method:'DELETE'});await loadNotes();await loadStats();toast('Trash emptied');
 }
 function showEditorEmpty(){flushSave();document.getElementById('editorPanel').style.display='none';document.getElementById('editorEmpty').style.display='flex';currentNote=null;}
@@ -710,7 +1048,7 @@ function closeEditor(){
 }
 
 async function saveNote(){
-    if(!currentNote||currentNote.deleted_at)return;
+    if(!currentNote||currentNote.deleted_at||isOffline)return;
     try{
         const editor=document.getElementById('editorContent');
         let html=editor.innerHTML;
@@ -730,21 +1068,21 @@ async function saveNote(){
 }
 let refreshTimer=null;
 function refreshList(){clearTimeout(refreshTimer);refreshTimer=setTimeout(async()=>{await loadNotes();await loadStats();},500);}
-function scheduleSave(){if(currentNote&&currentNote.deleted_at)return;document.getElementById('editorSaveStatus').textContent='● Modified';clearTimeout(saveTimeout);saveTimeout=setTimeout(saveNote,800);}
+function scheduleSave(){if(isOffline||!currentNote||(currentNote&&currentNote.deleted_at))return;document.getElementById('editorSaveStatus').textContent='● Modified';clearTimeout(saveTimeout);saveTimeout=setTimeout(saveNote,800);}
 document.getElementById('editorTitle').addEventListener('input',scheduleSave);
 document.getElementById('editorContent').addEventListener('input',()=>{scheduleSave();updateWordCount();updateFormatState();});
 document.getElementById('noteFolderSelect').addEventListener('change',async()=>{
-    if(!currentNote)return;await api('/notes/'+currentNote.id,{method:'PUT',body:{folder_id:document.getElementById('noteFolderSelect').value||null}});
+    if(!currentNote||isOffline)return;await api('/notes/'+currentNote.id,{method:'PUT',body:{folder_id:document.getElementById('noteFolderSelect').value||null}});
     await loadNotes();await loadStats();toast('Note moved');
 });
 async function togglePin(){
-    if(!currentNote)return;const p=!currentNote.pinned;
+    if(!currentNote||isOffline)return;const p=!currentNote.pinned;
     await api('/notes/'+currentNote.id,{method:'PUT',body:{pinned:p}});
     currentNote.pinned=p;document.getElementById('pinBtn').style.opacity=p?1:0.4;
     await loadNotes();toast(p?'Pinned':'Unpinned');
 }
 async function deleteCurrentNote(){
-    if(!currentNote)return;
+    if(!currentNote||isOffline)return;
     if(currentNote.deleted_at){permanentDelete();return;}
     if(!confirm('Move to trash?'))return;
     await api('/notes/'+currentNote.id,{method:'DELETE'});
@@ -763,6 +1101,30 @@ function closeExportMenu(){document.getElementById('exportDropdown').classList.r
 function exportNote(format){
     if(!currentNote)return;
     closeExportMenu();
+
+    // If offline, generate export client-side from cached content
+    if (isOffline) {
+        const title = currentNote.title || 'note';
+        const safeName = title.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_').substring(0, 50) || 'note';
+        let blob;
+        if (format === 'html') {
+            // Security: sanitize content before embedding in HTML export
+            const safeContent = sanitize(currentNote.content || '');
+            const htmlContent = '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>' + escHtml(title) + '</title><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}h1{border-bottom:2px solid #6c5ce7;padding-bottom:8px}img{max-width:100%;border-radius:8px}</style></head><body><h1>' + escHtml(title) + '</h1>' + safeContent + '</body></html>';
+            blob = new Blob([htmlContent], { type: 'text/html' });
+        } else {
+            const plain = title + '\n' + '='.repeat(title.length) + '\n\n' + stripHtmlClient(currentNote.content || '');
+            blob = new Blob([plain], { type: 'text/plain' });
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName + (format === 'html' ? '.html' : '.txt');
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        toast('Note exported');
+        return;
+    }
+
     fetch('/api/notes/'+currentNote.id+'/export?format='+format,{headers:{'Authorization':'Bearer '+token}})
         .then(r=>{if(!r.ok)throw new Error();return r.blob();})
         .then(blob=>{
@@ -778,6 +1140,7 @@ function exportNote(format){
 // ══════════════════════════════════════════
 async function showVersions(){
     if(!currentNote)return;
+    if(isOffline){toast('Version history not available offline');return;}
     try{
         const versions=await api('/notes/'+currentNote.id+'/versions');
         document.getElementById('modalTitle').textContent='Version history';
@@ -899,6 +1262,7 @@ ec.addEventListener('dragleave',()=>{ec.closest('.editor-panel')?.classList.remo
 ec.addEventListener('drop',async(e)=>{e.preventDefault();ec.closest('.editor-panel')?.classList.remove('drop-zone-active');for(const f of e.dataTransfer.files){if(f.type.startsWith('image/'))await uploadImage(f);}});
 ec.addEventListener('paste',async(e)=>{const items=e.clipboardData?.items;if(!items)return;for(const item of items){if(item.type.startsWith('image/')){e.preventDefault();const f=item.getAsFile();if(f)await uploadImage(f);return;}}});
 async function uploadImage(file){
+    if(isOffline){toast('Offline — cannot upload');return;}
     if(!currentNote){toast("Select a note first");return;}
     const form=new FormData();form.append('file',file);
     try{const img=await api('/notes/'+currentNote.id+'/images',{method:'POST',body:form});if(img){ec.focus();document.execCommand('insertHTML',false,'<img src="'+img.url+'" alt="'+escHtml(file.name)+'" /><br>');setTimeout(()=>{document.querySelectorAll('#editorContent img:not(.img-resize-wrapper img)').forEach(i=>wrapImageForResize(i));},50);scheduleSave();toast('Image added');}}catch(err){toast('Error: '+err.message);}
@@ -936,6 +1300,7 @@ document.addEventListener('keydown',(e)=>{
 // FOLDER MANAGEMENT
 // ══════════════════════════════════════════
 function selectFolder(id){
+    if(isOffline && id === '__trash__'){toast('Trash not available offline');return;}
     currentFolder=id;
     document.querySelectorAll('.folder-item').forEach(el=>el.classList.toggle('active',el.dataset.folder===id));
     const names={'__all__':'All notes','__none__':'Uncategorized','__trash__':'Trash'};
@@ -951,9 +1316,9 @@ function updateFolderSelect(){
 // Context menu
 function showContextMenu(e,folder){e.preventDefault();e.stopPropagation();contextTarget=folder;const m=document.getElementById('contextMenu');m.classList.add('show');m.style.left=Math.min(e.clientX,innerWidth-220)+'px';m.style.top=Math.min(e.clientY,innerHeight-150)+'px';}
 document.addEventListener('click',()=>document.getElementById('contextMenu').classList.remove('show'));
-function contextRename(){if(!contextTarget)return;showModal('Rename','New name',contextTarget.name,'Rename',async(n)=>{if(n.trim()){await api('/folders/'+contextTarget.id,{method:'PUT',body:{name:n.trim()}});await loadFolders();toast('Folder renamed');}});}
-function contextCreateSub(){if(!contextTarget)return;createFolder(contextTarget.id);}
-async function contextDelete(){if(!contextTarget||!confirm('Delete "'+contextTarget.name+'" ?'))return;await api('/folders/'+contextTarget.id,{method:'DELETE'});if(currentFolder===contextTarget.id)selectFolder('__all__');await loadFolders();await loadNotes();await loadStats();toast('Folder deleted');}
+function contextRename(){if(!contextTarget||isOffline)return;showModal('Rename','New name',contextTarget.name,'Rename',async(n)=>{if(n.trim()){await api('/folders/'+contextTarget.id,{method:'PUT',body:{name:n.trim()}});await loadFolders();toast('Folder renamed');}});}
+function contextCreateSub(){if(!contextTarget||isOffline)return;createFolder(contextTarget.id);}
+async function contextDelete(){if(!contextTarget||isOffline||!confirm('Delete "'+contextTarget.name+'" ?'))return;await api('/folders/'+contextTarget.id,{method:'DELETE'});if(currentFolder===contextTarget.id)selectFolder('__all__');await loadFolders();await loadNotes();await loadStats();toast('Folder deleted');}
 
 // ══════════════════════════════════════════
 // ADMIN
@@ -1083,11 +1448,14 @@ document.addEventListener('keydown',(e)=>{
     if(e.key==='Escape'){closeModal();document.getElementById('contextMenu').classList.remove('show');closeExportMenu();}
 });
 // Save before leaving
-window.addEventListener('beforeunload',(e)=>{if(saveTimeout&&currentNote){clearTimeout(saveTimeout);saveTimeout=null;const editor=document.getElementById('editorContent');const xhr=new XMLHttpRequest();xhr.open('PUT','/api/notes/'+currentNote.id,false);xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('Authorization','Bearer '+token);xhr.send(JSON.stringify({title:document.getElementById('editorTitle').value||'Untitled',content:editor.innerHTML}));}});
+window.addEventListener('beforeunload',(e)=>{if(!isOffline&&saveTimeout&&currentNote){clearTimeout(saveTimeout);saveTimeout=null;const editor=document.getElementById('editorContent');const xhr=new XMLHttpRequest();xhr.open('PUT','/api/notes/'+currentNote.id,false);xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('Authorization','Bearer '+token);xhr.send(JSON.stringify({title:document.getElementById('editorTitle').value||'Untitled',content:editor.innerHTML}));}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&saveTimeout)flushSave();});
 
 // PWA
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+
+// ── Periodic offline sync (every 5 minutes when online) ──
+setInterval(() => { if (!isOffline && token) syncOfflineData(); }, 5 * 60 * 1000);
 
 // ── Initialize base history state ──────────────────────────────────────────
 // This ensures there is always a "list" state at the bottom of the stack
