@@ -147,6 +147,7 @@
         .fa button:hover{color:var(--text-primary);background:var(--bg-active)}
         .sidebar-section{padding:20px 14px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-ghost);display:flex;justify-content:space-between;align-items:center}
         .sidebar-footer{padding:16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+	.sidebar-version{text-align:center;padding:6px 16px 12px;font-size:11px;color:var(--text-ghost);font-family:var(--mono);letter-spacing:0.02em}
         .user-info{display:flex;align-items:center;gap:10px}
         .user-avatar{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--accent-grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:var(--shadow-sm)}
         .user-name{font-size:13px;font-weight:600;color:var(--text-primary)}
@@ -356,6 +357,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
+		    <div class="sidebar-version">v1.0.3</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
