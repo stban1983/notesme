@@ -873,11 +873,18 @@ async function loadFolders(){
     }
     renderFolders();
 }
+
+function getFolderTotalCount(folderId) {
+    const direct = folderCounts[folderId] || 0;
+    const children = folders.filter(f => f.parent_id === folderId);
+    return direct + children.reduce((sum, child) => sum + getFolderTotalCount(child.id), 0);
+}
+
 function renderFolders(){
     const c=document.getElementById('foldersContainer');c.innerHTML='';
     const roots=folders.filter(f=>!f.parent_id);
     function rf(folder,depth=0){
-        const nc=folderCounts[folder.id]||0;
+        const nc=getFolderTotalCount[folder.id]||0;
         const d=document.createElement('div');
         d.className='folder-item'+(currentFolder===folder.id?' active':'');
         d.dataset.folder=folder.id;d.dataset.depth=depth;
