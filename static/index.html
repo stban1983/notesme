@@ -877,7 +877,7 @@ async function loadFolders(){
 }
 
 function getFolderTotalCount(folderId) {
-    const direct = folderCounts(folderId) || 0;
+    const direct = folderCounts[folderId] || 0;
     const children = folders.filter(f => f.parent_id === folderId);
     return direct + children.reduce((sum, child) => sum + getFolderTotalCount(child.id), 0);
 }
