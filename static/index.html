@@ -884,7 +884,7 @@ function renderFolders(){
     const c=document.getElementById('foldersContainer');c.innerHTML='';
     const roots=folders.filter(f=>!f.parent_id);
     function rf(folder,depth=0){
-        const nc=getFolderTotalCount[folder.id]||0;
+        const nc=getFolderTotalCount(folder.id)||0;
         const d=document.createElement('div');
         d.className='folder-item'+(currentFolder===folder.id?' active':'');
         d.dataset.folder=folder.id;d.dataset.depth=depth;
