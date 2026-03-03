@@ -89,7 +89,7 @@ ALLOWED_TAGS = {
     "hr",
 }
 ALLOWED_ATTRIBUTES = {
-    "a": {"href", "title", "target", "rel"},
+    "a": {"href", "title", "target"},
     "img": {"src", "alt", "title", "width", "height", "style"},
     "td": {"colspan", "rowspan", "style"},
     "th": {"colspan", "rowspan", "style"},
