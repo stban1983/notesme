@@ -6,7 +6,7 @@ This update focuses on hardening the application against common web attacks.
 
 ### Server-side content cleaning
 
-All note content, titles, and folder names are now sanitized on the server before being saved. This blocks malicious code injection (XSS) even if someone bypasses the web interface (e.g. using Postman or a script). We use nh3, a fast Rust-based HTML sanitizer — your formatting (bold, lists, links, images, tables...) is preserved, but dangerous elements like <script> or <iframe> are stripped out.
+All note content, titles, and folder names are now sanitized on the server before being saved. This blocks malicious code injection (XSS) even if someone bypasses the web interface (e.g. using Postman or a script). It use nh3, a fast Rust-based HTML sanitizer — your formatting (bold, lists, links, images, tables...) is preserved, but dangerous elements like <script> or <iframe> are stripped out.
 
 ### Smarter rate limiting behind a proxy
 
