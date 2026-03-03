@@ -15,10 +15,13 @@ from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import jwt
 from cryptography.fernet import Fernet
+import nh3
 
 # ─── Argon2 password hashing ───
 try:
@@ -44,6 +47,79 @@ MAX_VERSIONS_PER_NOTE = int(os.environ.get("MAX_VERSIONS_PER_NOTE", "50"))
 MAX_UPLOAD_SIZE = int(os.environ.get("MAX_UPLOAD_SIZE", str(10 * 1024 * 1024)))  # 10 MB
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# ─── Reverse Proxy Config ───
+# Set to the number of trusted reverse proxies in front of the app (e.g. 1 for Nginx/Traefik)
+TRUSTED_PROXY_COUNT = int(os.environ.get("TRUSTED_PROXY_COUNT", "0"))
+
+def get_client_ip(request: Request) -> str:
+    """Extract real client IP, accounting for reverse proxies.
+    Uses X-Forwarded-For (standard) or X-Real-IP (Nginx) when behind trusted proxies.
+    TRUSTED_PROXY_COUNT=0 means direct exposure (no proxy), uses request.client.host.
+    TRUSTED_PROXY_COUNT=1 means one proxy (typical): take the last-but-one entry in X-Forwarded-For.
+    """
+    if TRUSTED_PROXY_COUNT > 0:
+        # X-Forwarded-For: client, proxy1, proxy2 — rightmost entries are from trusted proxies
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            # The client IP is at index -(TRUSTED_PROXY_COUNT + 1) from the right
+            # e.g. with 1 proxy: "real_client, proxy" → parts[-2] = real_client
+            idx = -(TRUSTED_PROXY_COUNT + 1)
+            if abs(idx) <= len(parts):
+                return parts[idx]
+            # Fewer entries than expected proxies → take the leftmost (safest)
+            return parts[0]
+        # Fallback to X-Real-IP (set by Nginx)
+        real_ip = request.headers.get("X-Real-IP", "")
+        if real_ip:
+            return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+# ─── HTML Sanitization (server-side, defense in depth) ───
+# Tags and attributes allowed in note content (rich text from the editor)
+ALLOWED_TAGS = {
+    "p", "br", "div", "span",
+    "b", "strong", "i", "em", "u", "s", "strike", "del", "sub", "sup", "mark",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li",
+    "blockquote", "pre", "code",
+    "a", "img",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "hr",
+}
+ALLOWED_ATTRIBUTES = {
+    "a": {"href", "title", "target", "rel"},
+    "img": {"src", "alt", "title", "width", "height", "style"},
+    "td": {"colspan", "rowspan", "style"},
+    "th": {"colspan", "rowspan", "style"},
+    "span": {"style"},
+    "p": {"style"},
+    "div": {"style"},
+    "*": {"class"},
+}
+# URL schemes allowed in href/src (block javascript:, data:text/html, etc.)
+ALLOWED_URL_SCHEMES = {"http", "https", "mailto", "data"}
+
+def sanitize_html(content: str) -> str:
+    """Sanitize rich HTML content: keep safe formatting tags, strip dangerous ones
+    (script, iframe, object, embed, event handlers, javascript: URLs, etc.)."""
+    if not content:
+        return content
+    return nh3.clean(
+        content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        url_schemes=ALLOWED_URL_SCHEMES,
+        link_rel="noopener noreferrer",
+        strip_comments=True,
+    )
+
+def sanitize_text(text: str) -> str:
+    """Sanitize plain text fields (titles, folder names): strip ALL HTML tags."""
+    if not text:
+        return text
+    return nh3.clean(text, tags=set())
 
 # ─── Rate Limiting ───
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
@@ -104,6 +180,31 @@ def strip_html(html_text: str) -> str:
 
 # ─── Database ───
 app = FastAPI(title="Notes", docs_url=None, redoc_url=None)
+
+# ─── Security Headers Middleware (defense in depth) ───
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # CSP: allow inline styles (editor), specific CDNs, inline scripts (large app script in index.html)
+        # Server-side nh3 sanitization is the primary XSS defense; CSP is defense-in-depth
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' https://cdnjs.cloudflare.com; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "frame-ancestors 'none'"
+        )
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -328,7 +429,7 @@ def require_admin(user=Depends(get_current_user)):
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     check_rate_limit(ip)
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE username = ?", (req.username,)).fetchone()
@@ -427,7 +528,7 @@ def create_folder(req: FolderCreate, user=Depends(get_current_user)):
             db.close()
             raise HTTPException(404, "Dossier parent introuvable")
     db.execute("INSERT INTO folders (id, name, parent_id, user_id) VALUES (?, ?, ?, ?)",
-               (fid, req.name, req.parent_id, user["user_id"]))
+               (fid, sanitize_text(req.name), req.parent_id, user["user_id"]))
     db.commit()
     folder = db.execute("SELECT * FROM folders WHERE id = ?", (fid,)).fetchone()
     db.close()
@@ -442,7 +543,7 @@ def update_folder(folder_id: str, req: FolderUpdate, user=Depends(get_current_us
         db.close()
         raise HTTPException(404, "Dossier introuvable")
     if req.name is not None:
-        db.execute("UPDATE folders SET name = ? WHERE id = ?", (req.name, folder_id))
+        db.execute("UPDATE folders SET name = ? WHERE id = ?", (sanitize_text(req.name), folder_id))
     if req.parent_id != "__unchanged__":
         db.execute("UPDATE folders SET parent_id = ? WHERE id = ?", (req.parent_id, folder_id))
     db.commit()
@@ -514,9 +615,11 @@ def create_note(req: NoteCreate, user=Depends(get_current_user)):
     db = get_db()
     nid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
-    enc_content = encrypt_content(req.content or "")
+    safe_title = sanitize_text(req.title or "Sans titre")
+    safe_content = sanitize_html(req.content or "")
+    enc_content = encrypt_content(safe_content)
     db.execute("INSERT INTO notes (id, title, content, folder_id, user_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-               (nid, req.title, enc_content, req.folder_id, user["user_id"], now, now))
+               (nid, safe_title, enc_content, req.folder_id, user["user_id"], now, now))
     db.commit()
     note = db.execute("SELECT * FROM notes WHERE id = ?", (nid,)).fetchone()
     db.close()
@@ -549,9 +652,11 @@ def update_note(note_id: str, req: NoteUpdate, user=Depends(get_current_user)):
         maybe_save_version(db, note_id, note["title"], note["content"])
     now = datetime.now(timezone.utc).isoformat()
     if req.title is not None:
-        db.execute("UPDATE notes SET title=?, updated_at=? WHERE id=?", (req.title, now, note_id))
+        safe_title = sanitize_text(req.title)
+        db.execute("UPDATE notes SET title=?, updated_at=? WHERE id=?", (safe_title, now, note_id))
     if req.content is not None:
-        enc = encrypt_content(req.content)
+        safe_content = sanitize_html(req.content)
+        enc = encrypt_content(safe_content)
         db.execute("UPDATE notes SET content=?, updated_at=? WHERE id=?", (enc, now, note_id))
     if req.folder_id != "__unchanged__":
         db.execute("UPDATE notes SET folder_id=?, updated_at=? WHERE id=?", (req.folder_id, now, note_id))
@@ -628,12 +733,13 @@ def export_note(note_id: str, format: str = "txt", user=Depends(get_current_user
     content = decrypt_content(note["content"])
     safe_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')[:50] or "note"
     if format == "html":
-        # Escape title to prevent XSS in exported HTML
+        # Escape title and sanitize content to prevent XSS in exported HTML
         escaped_title = html_module.escape(title)
+        safe_export_content = sanitize_html(content)
         body = f"""<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>{escaped_title}</title>
 <style>body{{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#222}}
 h1{{border-bottom:2px solid #6c5ce7;padding-bottom:8px}}img{{max-width:100%;border-radius:8px}}</style>
-</head><body><h1>{escaped_title}</h1>{content}</body></html>"""
+</head><body><h1>{escaped_title}</h1>{safe_export_content}</body></html>"""
         return Response(content=body, media_type="text/html",
             headers={"Content-Disposition": f'attachment; filename="{safe_title}.html"'})
     else:
