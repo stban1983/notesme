@@ -15,14 +15,22 @@ Secure - Simple - SelfHosted
 
 Read on for all the details and features!
 
+<br>
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+## Demo
 
-Some Screenshots:
+🎉 You want to test NotesMe right now ? You can jump to the demo site:
+
+https://notesme.demo-portal.eu/
+
+User: demo
+
+password: notesme  
+  
+<br>
+<br>
+  
+## Screenshots:
 
 Login:
 
@@ -239,6 +247,11 @@ data/
 
 ---
 
+![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
 ## 📄 License
 
 MIT
