@@ -13,6 +13,16 @@ I think its main strengths are its simplicity, its lightweight design, and its n
 
 Secure - Simple - SelfHosted
 
+Why you should try:
+- Clean
+- Simple
+- No AI
+- Notes Versionning
+- Share functionnality
+- Export notes
+- Easy to Backup
+
+
 Read on for all the details and features!
 
 <br>
