@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.0] - 2026-09-03 - Functionality and fix Update
+
+Big updates today:
+
+- Dark theme more visible
+- Tasks were disapearing when closing a note
+- Some french text had been deleted
+- and the big one: The Markdown is now supported !
+
+
+
 ## [1.1.0] - 2026-03-03 - Security Update
 
 This update focuses on hardening the application against common web attacks.
