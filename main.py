@@ -87,6 +87,7 @@ ALLOWED_TAGS = {
     "a", "img",
     "table", "thead", "tbody", "tr", "th", "td",
     "hr",
+    "input",
 }
 ALLOWED_ATTRIBUTES = {
     "a": {"href", "title", "target"},
@@ -97,6 +98,8 @@ ALLOWED_ATTRIBUTES = {
     "p": {"style"},
     "div": {"style"},
     "*": {"class"},
+    "input": {"type", "checked"},
+    "pre": {"data-lang"},
 }
 # URL schemes allowed in href/src (block javascript:, data:text/html, etc.)
 ALLOWED_URL_SCHEMES = {"http", "https", "mailto", "data"}

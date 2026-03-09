@@ -25,10 +25,10 @@
             --bg-glass: rgba(18,18,26,0.7);
             --bg-glass-hover: rgba(26,26,38,0.8);
             --text-primary: #ededf0;
-            --text-secondary: #8888a0;
-            --text-tertiary: #55556a;
-            --text-ghost: #3a3a4d;
-            --border: rgba(255,255,255,0.06);
+            --text-secondary: #a0a0b8;
+            --text-tertiary: #7878a0;
+            --text-ghost: #606080;
+            --border: rgba(255,255,255,0.10);
             --border-subtle: rgba(255,255,255,0.03);
             --border-active: rgba(255,255,255,0.12);
             --accent-1: #6c5ce7;
@@ -151,7 +151,7 @@
         .user-info{display:flex;align-items:center;gap:10px}
         .user-avatar{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--accent-grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:var(--shadow-sm)}
         .user-name{font-size:13px;font-weight:600;color:var(--text-primary)}
-        .user-role{font-size:11px;color:var(--text-tertiary)}
+        .user-role{font-size:11px;color:var(--text-secondary)}
         .folder-item[data-depth="1"]{padding-left:32px}
         .folder-item[data-depth="2"]{padding-left:48px}
         .folder-item[data-depth="3"]{padding-left:64px}
@@ -166,7 +166,7 @@
         .note-card.active{background:var(--bg-surface);border-color:var(--border-active);box-shadow:var(--shadow-sm),inset 0 0 0 1px var(--border)}
         .note-card.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--accent-grad);border-radius:0 4px 4px 0}
         .note-card-title{font-size:14px;font-weight:600;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.01em}
-        .note-card-preview{font-size:12.5px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;line-height:1.4}
+        .note-card-preview{font-size:12.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;line-height:1.4}
         .note-card-meta{font-size:11px;color:var(--text-ghost);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
         .note-card-pin{color:var(--warning);font-size:12px;display:flex;align-items:center}
         .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-ghost);text-align:center;padding:40px}
@@ -208,6 +208,20 @@
         .editor-content a{color:var(--accent-2);text-decoration:none;border-bottom:1px solid rgba(0,206,201,0.3);transition:border-color var(--tr);cursor:pointer}
         .editor-content a:hover{border-bottom-color:var(--accent-2)}
         .editor-content code{font-family:var(--mono);background:var(--bg-elevated);padding:2px 6px;border-radius:4px;font-size:0.9em;color:var(--accent-2)}
+        .editor-content pre{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;overflow-x:auto;position:relative;margin:12px 0;white-space:pre-wrap;word-wrap:break-word}
+        .editor-content pre::before{content:attr(data-lang);position:absolute;top:6px;right:10px;font-size:10px;font-family:var(--mono);color:var(--text-ghost);text-transform:uppercase;letter-spacing:0.05em;pointer-events:none}
+        .editor-content pre code{background:none;padding:0;border-radius:0;color:var(--text-primary);font-size:13px;line-height:1.7;display:block}
+        .editor-content table{border-collapse:collapse;width:100%;margin:12px 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+        .editor-content th,.editor-content td{border:1px solid var(--border);padding:8px 12px;text-align:left;font-size:13px;min-width:60px}
+        .editor-content th{background:var(--bg-elevated);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-secondary)}
+        .token.comment,.token.prolog,.token.doctype,.token.cdata{color:var(--text-ghost);font-style:italic}
+        .token.punctuation{color:var(--text-secondary)}
+        .token.property,.token.tag,.token.boolean,.token.number,.token.constant,.token.symbol,.token.deleted{color:#e06c75}
+        .token.selector,.token.attr-name,.token.string,.token.char,.token.builtin,.token.inserted{color:#98c379}
+        .token.operator,.token.entity,.token.url{color:#56b6c2}
+        .token.atrule,.token.attr-value,.token.keyword{color:#c678dd}
+        .token.function,.token.class-name{color:#61afef}
+        .token.regex,.token.important,.token.variable{color:#d19a66}
         .checklist-item{display:flex;align-items:flex-start;gap:8px;margin:4px 0;list-style:none}
         .checklist-item input[type=checkbox]{margin-top:4px;cursor:pointer;width:16px;height:16px;accent-color:var(--accent-1)}
         .checklist-item.checked>span{text-decoration:line-through;color:var(--text-ghost)}
@@ -261,7 +275,7 @@
         .version-item:hover{background:var(--bg-hover);border-color:var(--border-active)}
         .version-item .v-info{display:flex;flex-direction:column;gap:2px}
         .version-item .v-title{font-size:13px;font-weight:600}
-        .version-item .v-date{font-size:11px;color:var(--text-tertiary);font-family:var(--mono)}
+        .version-item .v-date{font-size:11px;color:var(--text-secondary);font-family:var(--mono)}
         .version-item .v-actions{display:flex;gap:4px}
 
         /* ═══ EXPORT DROPDOWN ═══ */
@@ -295,11 +309,14 @@
         .offline-banner{display:none;align-items:center;justify-content:center;gap:10px;padding:10px 20px;background:linear-gradient(135deg,rgba(255,212,59,0.12),rgba(255,107,107,0.08));border-bottom:1px solid rgba(255,212,59,0.25);font-size:13px;font-weight:600;color:var(--warning);z-index:50;animation:fadeIn .3s ease;position:fixed;top:0;left:0;right:0;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
         .offline-banner.show{display:flex}
         .offline-banner .i{font-size:16px}
-        .offline-banner .offline-sync-info{font-size:11px;font-weight:400;color:var(--text-tertiary);margin-left:4px}
+        .offline-banner .offline-sync-info{font-size:11px;font-weight:400;color:var(--text-secondary);margin-left:4px}
         body.is-offline .app-layout{padding-top:40px}
         .offline-readonly-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:rgba(255,212,59,0.15);color:var(--warning);margin-left:8px}
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>window.Prism=window.Prism||{};Prism.manual=true;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <!-- ═══ LOGIN ═══ -->
@@ -357,7 +374,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v1.1.1</div>
+					<div class="sidebar-version">v1.2.0</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -392,7 +409,7 @@
                     <div style="position:relative">
                         <button class="btn-icon" onclick="toggleExportMenu()" title="Export"><span class="i"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></button>
                         <div class="export-dropdown" id="exportDropdown">
-                            <button onclick="exportNote('txt')"><span class="i"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span> Texte brut (.txt)</button>
+                            <button onclick="exportNote('txt')"><span class="i"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg></span> Plain text (.txt)</button>
                             <button onclick="exportNote('html')"><span class="i"><svg viewBox="0 0 24 24"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg></span> Document (.html)</button>
                         </div>
                     </div>
@@ -406,20 +423,20 @@
                     <option value="">Style</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option>
                 </select>
                 <div class="format-sep"></div>
-                <button class="format-btn" onclick="execCmd('bold')" data-cmd="bold" title="Gras (Ctrl+B)"><b>B</b></button>
-                <button class="format-btn" onclick="execCmd('italic')" data-cmd="italic" title="Italique (Ctrl+I)"><i>I</i></button>
+                <button class="format-btn" onclick="execCmd('bold')" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                <button class="format-btn" onclick="execCmd('italic')" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
                 <button class="format-btn" onclick="execCmd('underline')" data-cmd="underline" title="Underline (Ctrl+U)"><u>S</u></button>
                 <button class="format-btn" onclick="execCmd('strikeThrough')" data-cmd="strikeThrough" title="Strikethrough"><s>ab</s></button>
                 <div class="format-sep"></div>
                 <div class="color-input-wrapper" title="Text color"><button class="format-btn"><div class="color-swatch" id="colorSwatch" style="background:var(--text-primary)"></div></button><input type="color" id="textColorPicker" value="#ededf0" onchange="applyColor(this.value)"></div>
-                <button class="format-btn" onclick="applyHighlight()" title="Surligner"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></button>
-                <button class="format-btn" onclick="removeFormat()" title="Effacer format"><span class="i"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></span></button>
+                <button class="format-btn" onclick="applyHighlight()" title="Highlight"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></button>
+                <button class="format-btn" onclick="removeFormat()" title="Erase format"><span class="i"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></span></button>
                 <div class="format-sep"></div>
                 <button class="format-btn" onclick="execCmd('insertUnorderedList')" data-cmd="insertUnorderedList" title="Liste"><span class="i"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span></button>
                 <button class="format-btn" onclick="execCmd('insertOrderedList')" data-cmd="insertOrderedList" title="Liste num."><span class="i"><svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span></button>
                 <button class="format-btn" onclick="insertChecklist()" title="Checklist"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span></button>
                 <div class="format-sep"></div>
-                <button class="format-btn" onclick="insertLink()" title="Lien (Ctrl+K)"><span class="i"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></span></button>
+                <button class="format-btn" onclick="insertLink()" title="Link (Ctrl+K)"><span class="i"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></span></button>
                 <button class="format-btn" onclick="insertHR()" title="Separator"><span class="i"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></span></button>
             </div>
             <input type="text" class="editor-title" id="editorTitle" placeholder="Untitled">
@@ -699,8 +716,8 @@ function icon(name,size){return '<span class="i"'+(size?' style="font-size:'+siz
 // SANITIZE (DOMPurify)
 // ══════════════════════════════════════════
 const PURIFY_CONFIG = {
-    ALLOWED_TAGS: ['b','i','u','s','em','strong','ul','ol','li','a','img','h1','h2','h3','h4','h5','h6','p','br','div','span','blockquote','pre','code','table','thead','tbody','tr','td','th','hr','input','label','sub','sup'],
-    ALLOWED_ATTR: ['href','src','alt','title','width','height','style','class','target','type','checked','data-handle'],
+    ALLOWED_TAGS: ['b','i','u','s','strike','del','em','strong','ul','ol','li','a','img','h1','h2','h3','h4','h5','h6','p','br','div','span','blockquote','pre','code','table','thead','tbody','tr','td','th','hr','input','label','sub','sup'],
+    ALLOWED_ATTR: ['href','src','alt','title','width','height','style','class','target','type','checked','data-handle','data-lang'],
     ALLOW_DATA_ATTR: false,
 };
 function sanitize(html){
@@ -961,7 +978,7 @@ function renderNotes(){
         const preview=(n.preview||'').substring(0,120);
         return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')" style="animation:fadeIn .3s ease '+(i*0.03)+'s both">'
             +'<div class="note-card-title">'+escHtml(n.title||'Untitled')+'</div>'
-            +'<div class="note-card-preview">'+escHtml(preview||'Note vide')+'</div>'
+            +'<div class="note-card-preview">'+escHtml(preview||'Empty note')+'</div>'
             +'<div class="note-card-meta">'+(n.pinned?'<span class="note-card-pin">'+icon('pin','12px')+'</span>':'')+'<span>'+formatDate(n.updated_at)+'</span>'+(n.deleted_at?' <span style="color:var(--danger)">· Deleted</span>':'')+'</div></div>';
     }).join('');
 }
@@ -1019,7 +1036,7 @@ async function selectNote(id){
     }
     updateWordCount();renderNotes();
     document.querySelectorAll('#editorContent img:not(.img-resize-wrapper img)').forEach(img=>wrapImageForResize(img));
-    bindCheckboxes();autoLinkUrls();
+    bindCheckboxes();autoLinkUrls();highlightCode();
 
     // ── Android back: push a history entry
     if(window.innerWidth <= 900){
@@ -1154,7 +1171,7 @@ async function showVersions(){
         const versions=await api('/notes/'+currentNote.id+'/versions');
         document.getElementById('modalTitle').textContent='Version history';
         if(!versions||!versions.length){
-            document.getElementById('modalBody').innerHTML='<p style="color:var(--text-tertiary);text-align:center;padding:20px 0">No versions recorded.<br><span style="font-size:12px">Versions are automatically saved every 5 min.</span></p>';
+            document.getElementById('modalBody').innerHTML='<p style="color:var(--text-secondary);text-align:center;padding:20px 0">No versions recorded.<br><span style="font-size:12px">Versions are automatically saved every 5 min.</span></p>';
         } else {
             document.getElementById('modalBody').innerHTML=versions.map(v=>{
                 const d=new Date(v.created_at);
@@ -1173,7 +1190,8 @@ async function previewVersion(vid){
     try{
         const v=await api('/notes/'+currentNote.id+'/versions/'+vid);
         document.getElementById('modalTitle').textContent='Version: '+v.title;
-        document.getElementById('modalBody').innerHTML='<div style="max-height:300px;overflow-y:auto;padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border);font-size:14px;line-height:1.7">'+sanitize(v.content)+'</div>';
+        document.getElementById('modalBody').innerHTML='<div class="editor-content" style="max-height:300px;overflow-y:auto;padding:16px;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border);font-size:14px;line-height:1.7">'+sanitize(v.content)+'</div>';
+        document.querySelectorAll('#modalBody pre code[class*="language-"]').forEach(el=>{if(typeof Prism!=='undefined')try{Prism.highlightElement(el);}catch(e){}});
         document.getElementById('modalActions').innerHTML='<button class="btn btn-ghost" onclick="showVersions()">Back</button><button class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="restoreVersionById('+vid+')">Restore this version</button>';
     }catch(e){toast('Error: '+e.message);}
 }
@@ -1185,7 +1203,7 @@ async function restoreVersionById(vid){
             currentNote=restored;
             document.getElementById('editorTitle').value=restored.title;
             document.getElementById('editorContent').innerHTML=sanitize(restored.content||'');
-            updateWordCount();closeModal();toast('Version restored');refreshList();
+            updateWordCount();bindCheckboxes();highlightCode();closeModal();toast('Version restored');refreshList();
         }
     }catch(e){toast('Error: '+e.message);}
 }
@@ -1216,7 +1234,7 @@ function insertChecklist(){
 }
 function bindCheckboxes(){
     document.querySelectorAll('#editorContent .checklist-item input[type=checkbox]').forEach(cb=>{
-        cb.onchange=function(){this.closest('.checklist-item').classList.toggle('checked',this.checked);scheduleSave();};
+        cb.onchange=function(){if(this.checked)this.setAttribute('checked','');else this.removeAttribute('checked');this.closest('.checklist-item').classList.toggle('checked',this.checked);scheduleSave();};
         const li=cb.closest('.checklist-item');
         if(cb.checked)li.classList.add('checked');else li.classList.remove('checked');
     });
@@ -1470,6 +1488,245 @@ setInterval(() => { if (!isOffline && token) syncOfflineData(); }, 5 * 60 * 1000
 // This ensures there is always a "list" state at the bottom of the stack
 // before any editor/sidebar states are pushed on mobile.
 history.replaceState({ view: 'list' }, '', location.pathname + location.search);
+
+// ── Prism autoloader config ──
+if(typeof Prism!=='undefined'&&Prism.plugins&&Prism.plugins.autoloader){
+    Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+}
+function highlightCode(){
+    document.querySelectorAll('#editorContent pre code[class*="language-"]').forEach(el=>{
+        if(typeof Prism!=='undefined')try{Prism.highlightElement(el);}catch(e){}
+    });
+}
+
+// ══════════════════════════════════════════
+// MARKDOWN SHORTCUTS ENGINE
+// ══════════════════════════════════════════
+(function(){
+    const editor=document.getElementById('editorContent');
+
+    // ── Helpers ──
+    function getBlock(node){
+        let el=node.nodeType===3?node.parentElement:node;
+        while(el&&el.id!=='editorContent'){
+            if(el.parentElement&&el.parentElement.id==='editorContent'&&['P','DIV','H1','H2','H3','H4','H5','H6','BLOCKQUOTE','PRE','LI','UL','OL','TABLE'].includes(el.tagName))return el;
+            el=el.parentElement;
+        }
+        return null;
+    }
+    function placeCursor(el,atStart){
+        const sel=window.getSelection();const r=document.createRange();
+        if(el.firstChild){r.selectNodeContents(el);r.collapse(!!atStart);}else{el.innerHTML='\u00A0';r.selectNodeContents(el);r.collapse(false);}
+        sel.removeAllRanges();sel.addRange(r);
+    }
+    function isInsidePre(node){
+        let el=node.nodeType===3?node.parentElement:node;
+        while(el&&el.id!=='editorContent'){if(el.tagName==='PRE')return true;el=el.parentElement;}
+        return false;
+    }
+    function isInsideChecklist(node){
+        let el=node.nodeType===3?node.parentElement:node;
+        while(el&&el.id!=='editorContent'){if(el.classList&&el.classList.contains('checklist-item'))return true;el=el.parentElement;}
+        return false;
+    }
+
+    // ── Block shortcuts (on input after space) ──
+    function tryBlockMarkdown(node){
+        const text=node.textContent;
+        const block=getBlock(node);
+        if(!block||block.tagName==='PRE'||block.tagName==='CODE')return false;
+        // Already inside a list/blockquote? Skip
+        if(['LI'].includes(block.tagName))return false;
+
+        // Headings: # through ######
+        const hm=text.match(/^(#{1,6})\s$/);
+        if(hm){
+            const h=document.createElement('h'+hm[1].length);
+            h.innerHTML='<br>';block.replaceWith(h);placeCursor(h);scheduleSave();return true;
+        }
+        // Checklist: [] or [x]
+        if(/^\[\s?\]\s$/.test(text)){
+            const ul=document.createElement('ul');ul.className='checklist';
+            const li=document.createElement('li');li.className='checklist-item';
+            li.innerHTML='<input type="checkbox"><span>\u00A0</span>';
+            ul.appendChild(li);block.replaceWith(ul);placeCursor(li.querySelector('span'));
+            setTimeout(bindCheckboxes,10);scheduleSave();return true;
+        }
+        if(/^\[x\]\s$/i.test(text)){
+            const ul=document.createElement('ul');ul.className='checklist';
+            const li=document.createElement('li');li.className='checklist-item checked';
+            li.innerHTML='<input type="checkbox" checked><span>\u00A0</span>';
+            ul.appendChild(li);block.replaceWith(ul);placeCursor(li.querySelector('span'));
+            setTimeout(bindCheckboxes,10);scheduleSave();return true;
+        }
+        // Unordered list: - or *
+        if(/^[-*]\s$/.test(text)){
+            const ul=document.createElement('ul');const li=document.createElement('li');
+            li.innerHTML='<br>';ul.appendChild(li);block.replaceWith(ul);placeCursor(li);scheduleSave();return true;
+        }
+        // Ordered list: 1.
+        if(/^\d+\.\s$/.test(text)){
+            const ol=document.createElement('ol');const li=document.createElement('li');
+            li.innerHTML='<br>';ol.appendChild(li);block.replaceWith(ol);placeCursor(li);scheduleSave();return true;
+        }
+        // Blockquote: >
+        if(/^>\s$/.test(text)){
+            const bq=document.createElement('blockquote');bq.innerHTML='<br>';
+            block.replaceWith(bq);placeCursor(bq);scheduleSave();return true;
+        }
+        return false;
+    }
+
+    // ── Inline shortcuts ──
+    function tryInlineMarkdown(node){
+        if(isInsidePre(node)||isInsideChecklist(node))return false;
+        const sel=window.getSelection();
+        const offset=sel.anchorOffset;
+        const text=node.textContent;
+        const before=text.slice(0,offset);
+
+        // Bold: **text**
+        const bm=before.match(/\*\*(.+?)\*\*$/);
+        if(bm){replaceInline(node,bm,offset,'strong');return true;}
+        // Strikethrough: ~~text~~
+        const sm=before.match(/~~(.+?)~~$/);
+        if(sm){replaceInline(node,sm,offset,'s');return true;}
+        // Italic: *text* (not preceded by *)
+        const im=before.match(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*$/);
+        if(im){replaceInline(node,im,offset,'em');return true;}
+        // Italic: _text_
+        const im2=before.match(/(?<!\w)_(.+?)_$/);
+        if(im2){replaceInline(node,im2,offset,'em');return true;}
+        // Inline code: `text`
+        const cm=before.match(/(?<!`)`(?!`)(.+?)(?<!`)`$/);
+        if(cm){replaceInline(node,cm,offset,'code');return true;}
+        // Link: [text](url)
+        const lm=before.match(/\[(.+?)\]\((.+?)\)$/);
+        if(lm){
+            const start=offset-lm[0].length;
+            const r=document.createRange();r.setStart(node,start);r.setEnd(node,offset);r.deleteContents();
+            const a=document.createElement('a');a.href=lm[2];a.textContent=lm[1];a.target='_blank';
+            r.insertNode(a);
+            const sp=document.createTextNode('\u00A0');a.after(sp);
+            const nr=document.createRange();nr.setStartAfter(sp);nr.collapse(true);
+            sel.removeAllRanges();sel.addRange(nr);scheduleSave();return true;
+        }
+        return false;
+    }
+    function replaceInline(node,match,offset,tag){
+        const sel=window.getSelection();
+        const start=offset-match[0].length;
+        const content=match[1];
+        const r=document.createRange();r.setStart(node,start);r.setEnd(node,offset);r.deleteContents();
+        const el=document.createElement(tag);el.textContent=content;
+        r.insertNode(el);
+        const sp=document.createTextNode('\u00A0');el.after(sp);
+        const nr=document.createRange();nr.setStartAfter(sp);nr.collapse(true);
+        sel.removeAllRanges();sel.addRange(nr);scheduleSave();
+    }
+
+    // ── Input handler ──
+    editor.addEventListener('input',function(e){
+        if(e.inputType!=='insertText')return;
+        const sel=window.getSelection();
+        if(!sel.rangeCount||!sel.isCollapsed)return;
+        const node=sel.anchorNode;
+        if(!node||node.nodeType!==3)return;
+        if(e.data===' '){if(tryBlockMarkdown(node))return;}
+        tryInlineMarkdown(node);
+    });
+
+    // ── Enter-triggered shortcuts (---, ```, tables) ──
+    editor.addEventListener('keydown',function(e){
+        if(e.key!=='Enter')return;
+        const sel=window.getSelection();
+        if(!sel.rangeCount||!sel.isCollapsed)return;
+        const node=sel.anchorNode;
+        if(!node)return;
+
+        // ── Exit code block: Enter on empty last line ──
+        if(isInsidePre(node)){
+            const pre=node.nodeType===3?node.parentElement.closest('pre'):node.closest('pre');
+            if(pre){
+                const code=pre.querySelector('code')||pre;
+                const txt=code.textContent;
+                if(txt.endsWith('\n\n')||txt.endsWith('\n')){
+                    const trimmed=txt.replace(/\n+$/,'');
+                    if(sel.anchorOffset===node.textContent.length&&/\n$/.test(txt)){
+                        // Check if cursor is truly at the end
+                        const allText=code.textContent;
+                        const lines=allText.split('\n');
+                        if(lines.length>=2&&lines[lines.length-1]===''&&lines[lines.length-2]===''){
+                            e.preventDefault();
+                            code.textContent=trimmed+'\n';
+                            const p=document.createElement('p');p.innerHTML='<br>';
+                            pre.after(p);placeCursor(p);
+                            highlightCode();scheduleSave();return;
+                        }
+                    }
+                }
+            }
+            return; // Let Enter insert newline inside pre normally
+        }
+
+        const textNode=node.nodeType===3?node:node.firstChild;
+        if(!textNode||textNode.nodeType!==3)return;
+        const text=textNode.textContent.trim();
+        const block=getBlock(textNode);
+        if(!block)return;
+
+        // HR: --- or *** or ___
+        if(/^(-{3,}|\*{3,}|_{3,})$/.test(text)){
+            e.preventDefault();
+            const hr=document.createElement('hr');
+            const p=document.createElement('p');p.innerHTML='<br>';
+            block.replaceWith(hr);hr.after(p);placeCursor(p);scheduleSave();return;
+        }
+        // Code block: ``` or ```language
+        if(/^`{3}(.*)$/.test(text)){
+            e.preventDefault();
+            const lang=text.slice(3).trim()||'plaintext';
+            const pre=document.createElement('pre');pre.setAttribute('data-lang',lang);
+            const code=document.createElement('code');code.className='language-'+lang;
+            code.textContent='\n';pre.appendChild(code);
+            const p=document.createElement('p');p.innerHTML='<br>';
+            block.replaceWith(pre);pre.after(p);
+            // Place cursor inside code
+            const r=document.createRange();r.setStart(code.firstChild,0);r.collapse(true);
+            sel.removeAllRanges();sel.addRange(r);
+            scheduleSave();return;
+        }
+        // Table: | col | col |
+        if(/^\|(.+\|)+\s*$/.test(text)){
+            e.preventDefault();
+            const cells=text.split('|').filter(c=>c.trim()!=='');
+            const table=document.createElement('table');
+            const thead=document.createElement('thead');
+            const hr2=document.createElement('tr');
+            cells.forEach(c=>{const th=document.createElement('th');th.textContent=c.trim();hr2.appendChild(th);});
+            thead.appendChild(hr2);
+            const tbody=document.createElement('tbody');
+            const dr=document.createElement('tr');
+            cells.forEach(()=>{const td=document.createElement('td');td.innerHTML='\u00A0';dr.appendChild(td);});
+            tbody.appendChild(dr);
+            table.appendChild(thead);table.appendChild(tbody);
+            const p=document.createElement('p');p.innerHTML='<br>';
+            block.replaceWith(table);table.after(p);
+            placeCursor(dr.firstChild);scheduleSave();return;
+        }
+    },true);
+
+    // ── Tab inside code blocks → insert spaces ──
+    editor.addEventListener('keydown',function(e){
+        if(e.key==='Tab'&&isInsidePre(e.target)||e.key==='Tab'&&isInsidePre(window.getSelection().anchorNode)){
+            e.preventDefault();
+            document.execCommand('insertText',false,'  ');
+        }
+    });
+
+    // ── Re-highlight after leaving code blocks ──
+    editor.addEventListener('click',function(){setTimeout(highlightCode,100);});
+})();
 
 initTheme();init();
 </script>
