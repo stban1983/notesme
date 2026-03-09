@@ -1,12 +1,18 @@
 name: Build and Push multi-arch Docker Image
 
 on:
-  workflow_dispatch:  
+  # 1. DÉCLENCHEUR MANUEL
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: 'Tag Docker manuel (ex: test-ui, beta)'
+        required: true
+        default: 'dev'
+        
+  # 2. DÉCLENCHEUR AUTOMATIQUE (Uniquement pour les Releases)
   push:
-    #    branches:
-    #      - main
     tags:
-      - 'v*.*.*' # Se déclenche aussi quand tu crées un tag Git (ex: v1.0.0)
+      - 'v*.*.*'
 
 jobs:
   build-and-push:
@@ -33,17 +39,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --- NOUVELLE ÉTAPE : Gestion automatique des tags ---
       - name: Extraire les métadonnées (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/stban1983/notesme
           tags: |
-            type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            # --- RÈGLES POUR LE DÉCLENCHEMENT MANUEL ---
+            # Utilise la valeur que vous avez saisie dans l'interface GitHub
+            type=raw,value=${{ github.event.inputs.custom_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            
+            # --- RÈGLES POUR LES TAGS GIT (RELEASES) ---
+            # Crée les tags v1.0.0, v1.0, et met à jour "latest" UNIQUEMENT si c'est un tag Git qui déclenche
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       - name: Construire et Pousser l'image (AMD64, ARM64 et Alpine)
         uses: docker/build-push-action@v5
@@ -51,6 +61,5 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          # On utilise les tags générés par l'étape précédente
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
