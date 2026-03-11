@@ -387,7 +387,17 @@
                     <button class="btn-icon mobile-menu-btn" onclick="toggleSidebar()"><span class="i"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span></button>
                     <h3 id="currentFolderName">All notes</h3>
                 </div>
-                <button class="btn-icon" id="newNoteBtn" onclick="createNote()" title="New note" style="background:var(--accent-glow);color:var(--accent-1)"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <select id="sortSelect" onchange="changeSort(this.value)" title="Sort notes" style="background:var(--bg-2);color:var(--text-1);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;outline:none">
+                        <option value="updated_desc">Date modified ↓</option>
+                        <option value="updated_asc">Date modified ↑</option>
+                        <option value="created_desc">Date created ↓</option>
+                        <option value="created_asc">Date created ↑</option>
+                        <option value="title_asc">Title A→Z</option>
+                        <option value="title_desc">Title Z→A</option>
+                    </select>
+                    <button class="btn-icon" id="newNoteBtn" onclick="createNote()" title="New note" style="background:var(--accent-glow);color:var(--accent-1)"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+                </div>
             </div>
             <div id="trashBar" class="trash-bar hidden">
                 <span>Auto-deleted after 30 days</span>
@@ -477,6 +487,7 @@
 let token = localStorage.getItem('notes_token');
 let folders=[], notes=[], currentFolder='__all__', currentNote=null, saveTimeout=null, contextTarget=null;
 let isAdmin=false, isTrashView=false, folderCounts={};
+let currentSort = localStorage.getItem('notes_sort') || 'updated_desc';
 let isOffline = !navigator.onLine;
 
 // ══════════════════════════════════════════
@@ -778,6 +789,7 @@ async function showApp(username,admin){
     // Check offline state
     setOfflineState(!navigator.onLine);
 
+    document.getElementById('sortSelect').value=currentSort;
     await loadFolders();await loadNotes();await loadStats();showEditorEmpty();
 
     // ── Sync data for offline use (non-blocking) ──
@@ -971,10 +983,33 @@ async function loadNotes(){
     document.getElementById('trashBar').classList.toggle('hidden',!isTrashView);
     document.getElementById('newNoteBtn').style.display=isTrashView?'none':'';
 }
+function changeSort(val){
+    currentSort=val;
+    localStorage.setItem('notes_sort',val);
+    renderNotes();
+}
+function sortNotes(arr){
+    const sorted=[...arr];
+    sorted.sort((a,b)=>{
+        // Pinned notes always first
+        const pa=a.pinned?1:0, pb=b.pinned?1:0;
+        if(pa!==pb) return pb-pa;
+        switch(currentSort){
+            case 'updated_asc': return (a.updated_at||'').localeCompare(b.updated_at||'');
+            case 'created_desc': return (b.created_at||'').localeCompare(a.created_at||'');
+            case 'created_asc': return (a.created_at||'').localeCompare(b.created_at||'');
+            case 'title_asc': return (a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base'});
+            case 'title_desc': return (b.title||'').localeCompare(a.title||'',undefined,{sensitivity:'base'});
+            default: return (b.updated_at||'').localeCompare(a.updated_at||'');
+        }
+    });
+    return sorted;
+}
 function renderNotes(){
     const list=document.getElementById('noteList');
     if(!notes.length){list.innerHTML='<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><polyline points="14,2 14,8 20,8"/></svg></div><p>'+(isTrashView?'Trash is empty':'No notes')+'</p></div>';return;}
-    list.innerHTML=notes.map((n,i)=>{
+    const sorted=sortNotes(notes);
+    list.innerHTML=sorted.map((n,i)=>{
         const preview=(n.preview||'').substring(0,120);
         return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')" style="animation:fadeIn .3s ease '+(i*0.03)+'s both">'
             +'<div class="note-card-title">'+escHtml(n.title||'Untitled')+'</div>'
