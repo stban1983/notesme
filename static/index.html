@@ -285,6 +285,23 @@
         .export-dropdown button:hover{background:var(--bg-hover)}
         .export-dropdown button .i{font-size:15px;color:var(--text-tertiary)}
 
+        /* ═══ SORT DROPDOWN ═══ */
+        .sort-wrapper{position:relative;display:flex;align-items:center;gap:6px}
+        .sort-btn{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-sm);background:transparent;border:1px solid var(--border);cursor:pointer;transition:all var(--tr);color:var(--text-secondary)}
+        .sort-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-active)}
+        .sort-btn .i{font-size:16px}
+        .sort-btn .sort-label{font-size:11px;font-weight:600;white-space:nowrap;letter-spacing:0.01em;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+        .sort-dropdown{position:absolute;right:0;top:100%;margin-top:6px;background:var(--bg-surface);border:1px solid var(--border-active);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:6px;z-index:100;min-width:210px;animation:fadeUp .15s ease;display:none;backdrop-filter:blur(20px)}
+        .sort-dropdown.show{display:block}
+        .sort-dropdown button{display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:13px;color:var(--text-primary);cursor:pointer;border-radius:var(--radius-sm);border:none;background:none;width:100%;text-align:left;font-family:var(--font);font-weight:500;transition:all var(--tr)}
+        .sort-dropdown button:hover{background:var(--bg-hover)}
+        .sort-dropdown button .i{font-size:15px;color:var(--text-tertiary);flex-shrink:0}
+        .sort-dropdown button .sort-check{margin-left:auto;font-size:14px;color:var(--accent-1);opacity:0}
+        .sort-dropdown button.active{background:var(--accent-glow);color:var(--accent-1);font-weight:600}
+        .sort-dropdown button.active .i{color:var(--accent-1)}
+        .sort-dropdown button.active .sort-check{opacity:1}
+        .sort-sep{height:1px;background:var(--border);margin:4px 8px}
+
         /* ═══ SIDEBAR OVERLAY ═══ */
         .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9;backdrop-filter:blur(4px)}
         .sidebar-overlay.show{display:block}
@@ -374,7 +391,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v1.2.0</div>
+					<div class="sidebar-version">v1.2.1</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -383,11 +400,29 @@
         <!-- Note list -->
         <div class="note-list-panel">
             <div class="note-list-header">
-                <div style="display:flex;align-items:center;gap:10px">
+                <div style="display:flex;align-items:center;gap:30px">
                     <button class="btn-icon mobile-menu-btn" onclick="toggleSidebar()"><span class="i"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span></button>
                     <h3 id="currentFolderName">All notes</h3>
                 </div>
-                <button class="btn-icon" id="newNoteBtn" onclick="createNote()" title="New note" style="background:var(--accent-glow);color:var(--accent-1)"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+                <div style="display:flex;align-items:center;gap:14px">
+                    <div class="sort-wrapper">
+                        <button class="sort-btn" onclick="toggleSortMenu()" title="Sort notes">
+                            <span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h7"/><path d="M3 12h10"/><path d="M3 18h5"/><path d="M18 20V4"/><polyline points="15,7 18,4 21,7"/></svg></span>
+                            <span class="sort-label" id="sortLabel">Modified ↓</span>
+                        </button>
+                        <div class="sort-dropdown" id="sortDropdown">
+                            <button onclick="changeSort('updated_desc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14"/><polyline points="19,12 12,19 5,12"/></svg></span> Date modified ↓<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                            <button onclick="changeSort('updated_asc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><polyline points="5,12 12,5 19,12"/></svg></span> Date modified ↑<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                            <div class="sort-sep"></div>
+                            <button onclick="changeSort('created_desc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14"/><polyline points="19,12 12,19 5,12"/></svg></span> Date created ↓<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                            <button onclick="changeSort('created_asc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><polyline points="5,12 12,5 19,12"/></svg></span> Date created ↑<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                            <div class="sort-sep"></div>
+                            <button onclick="changeSort('title_asc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h7"/><path d="M3 12h10"/><path d="M3 18h14"/></svg></span> Title A → Z<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                            <button onclick="changeSort('title_desc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h14"/><path d="M3 12h10"/><path d="M3 18h7"/></svg></span> Title Z → A<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
+                        </div>
+                    </div>
+                    <button class="btn-icon" id="newNoteBtn" onclick="createNote()" title="New note" style="background:var(--accent-glow);color:var(--accent-1)"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+                </div>
             </div>
             <div id="trashBar" class="trash-bar hidden">
                 <span>Auto-deleted after 30 days</span>
@@ -477,6 +512,7 @@
 let token = localStorage.getItem('notes_token');
 let folders=[], notes=[], currentFolder='__all__', currentNote=null, saveTimeout=null, contextTarget=null;
 let isAdmin=false, isTrashView=false, folderCounts={};
+let currentSort = localStorage.getItem('notes_sort') || 'updated_desc';
 let isOffline = !navigator.onLine;
 
 // ══════════════════════════════════════════
@@ -778,6 +814,7 @@ async function showApp(username,admin){
     // Check offline state
     setOfflineState(!navigator.onLine);
 
+    updateSortLabel();
     await loadFolders();await loadNotes();await loadStats();showEditorEmpty();
 
     // ── Sync data for offline use (non-blocking) ──
@@ -971,10 +1008,50 @@ async function loadNotes(){
     document.getElementById('trashBar').classList.toggle('hidden',!isTrashView);
     document.getElementById('newNoteBtn').style.display=isTrashView?'none':'';
 }
+function toggleSortMenu(){
+    const dd=document.getElementById('sortDropdown');
+    dd.classList.toggle('show');
+    if(dd.classList.contains('show')){setTimeout(()=>document.addEventListener('click',closeSortMenu,{once:true}),0);}
+}
+function closeSortMenu(){document.getElementById('sortDropdown').classList.remove('show');}
+const sortLabels={updated_desc:'Modified ↓',updated_asc:'Modified ↑',created_desc:'Created ↓',created_asc:'Created ↑',title_asc:'A → Z',title_desc:'Z → A'};
+function updateSortLabel(){
+    document.getElementById('sortLabel').textContent=sortLabels[currentSort]||'Sort';
+    const btns=document.querySelectorAll('#sortDropdown button');
+    btns.forEach(b=>{
+        const val=b.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        b.classList.toggle('active',val===currentSort);
+    });
+}
+function changeSort(val){
+    currentSort=val;
+    localStorage.setItem('notes_sort',val);
+    updateSortLabel();
+    closeSortMenu();
+    renderNotes();
+}
+function sortNotes(arr){
+    const sorted=[...arr];
+    sorted.sort((a,b)=>{
+        // Pinned notes always first
+        const pa=a.pinned?1:0, pb=b.pinned?1:0;
+        if(pa!==pb) return pb-pa;
+        switch(currentSort){
+            case 'updated_asc': return (a.updated_at||'').localeCompare(b.updated_at||'');
+            case 'created_desc': return (b.created_at||'').localeCompare(a.created_at||'');
+            case 'created_asc': return (a.created_at||'').localeCompare(b.created_at||'');
+            case 'title_asc': return (a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base'});
+            case 'title_desc': return (b.title||'').localeCompare(a.title||'',undefined,{sensitivity:'base'});
+            default: return (b.updated_at||'').localeCompare(a.updated_at||'');
+        }
+    });
+    return sorted;
+}
 function renderNotes(){
     const list=document.getElementById('noteList');
     if(!notes.length){list.innerHTML='<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><polyline points="14,2 14,8 20,8"/></svg></div><p>'+(isTrashView?'Trash is empty':'No notes')+'</p></div>';return;}
-    list.innerHTML=notes.map((n,i)=>{
+    const sorted=sortNotes(notes);
+    list.innerHTML=sorted.map((n,i)=>{
         const preview=(n.preview||'').substring(0,120);
         return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')" style="animation:fadeIn .3s ease '+(i*0.03)+'s both">'
             +'<div class="note-card-title">'+escHtml(n.title||'Untitled')+'</div>'
