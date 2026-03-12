@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-12-03 - Functionality and fix Update
+
+- You can sort your notes!
+
+
 ## [1.2.0] - 2026-09-03 - Functionality and fix Update
 
 Big updates today:
