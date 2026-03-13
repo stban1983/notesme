@@ -21,6 +21,7 @@ Why you should try:
 - Share functionnality
 - Export notes
 - Easy to Backup
+- Markdown compatible
 
 
 Read on for all the details and features!
