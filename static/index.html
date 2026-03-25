@@ -171,6 +171,7 @@
         .note-card-title{font-size:14px;font-weight:600;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.01em}
         .note-card-preview{font-size:12.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;line-height:1.4}
         .search-hl{background:var(--warning);color:var(--bg-primary);border-radius:2px;padding:0 1px;font-weight:600}
+        mark.editor-search-hl{background:var(--warning);color:var(--bg-primary);border-radius:2px;padding:0 1px;font-weight:600}
         .note-card-meta{font-size:11px;color:var(--text-ghost);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
         .note-card-pin{color:var(--warning);font-size:12px;display:flex;align-items:center}
         .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-ghost);text-align:center;padding:40px}
@@ -1139,7 +1140,7 @@ async function selectNote(id){
     }
     updateWordCount();renderNotes();
     document.querySelectorAll('#editorContent img:not(.img-resize-wrapper img)').forEach(img=>wrapImageForResize(img));
-    bindCheckboxes();autoLinkUrls();highlightCode();
+    bindCheckboxes();autoLinkUrls();highlightCode();highlightSearchInEditor();
 
     // ── Android back: push a history entry
     if(window.innerWidth <= 900){
@@ -1181,6 +1182,7 @@ async function saveNote(){
     try{
         const editor=document.getElementById('editorContent');
         let html=editor.innerHTML;
+        html=html.replace(/<mark class="editor-search-hl">([\s\S]*?)<\/mark>/g,'$1');
         html=html.replace(/<span class="img-resize-handle[^"]*"[^>]*><\/span>/g,'');
         html=html.replace(/<span class="img-resize-info"[^>]*>.*?<\/span>/g,'');
         html=html.replace(/<span[^>]*class="img-resize-wrapper[^"]*"[^>]*>([\s\S]*?)<\/span>/g,function(match,inner){
@@ -1199,7 +1201,12 @@ let refreshTimer=null;
 function refreshList(){clearTimeout(refreshTimer);refreshTimer=setTimeout(async()=>{await loadNotes();await loadStats();},500);}
 function scheduleSave(){if(isOffline||!currentNote||(currentNote&&currentNote.deleted_at))return;document.getElementById('editorSaveStatus').textContent='● Modified';clearTimeout(saveTimeout);saveTimeout=setTimeout(saveNote,800);}
 document.getElementById('editorTitle').addEventListener('input',scheduleSave);
-document.getElementById('editorContent').addEventListener('input',()=>{scheduleSave();updateWordCount();updateFormatState();});
+document.getElementById('editorContent').addEventListener('input',()=>{
+    // Remove search highlights on first edit to keep content clean
+    const hl=document.querySelectorAll('#editorContent mark.editor-search-hl');
+    if(hl.length){hl.forEach(m=>{const p=m.parentNode;p.replaceChild(document.createTextNode(m.textContent),m);p.normalize();});}
+    scheduleSave();updateWordCount();updateFormatState();
+});
 document.getElementById('noteFolderSelect').addEventListener('change',async()=>{
     if(!currentNote||isOffline)return;await api('/notes/'+currentNote.id,{method:'PUT',body:{folder_id:document.getElementById('noteFolderSelect').value||null}});
     await loadNotes();await loadStats();toast('Note moved');
@@ -1595,6 +1602,43 @@ history.replaceState({ view: 'list' }, '', location.pathname + location.search);
 // ── Prism autoloader config ──
 if(typeof Prism!=='undefined'&&Prism.plugins&&Prism.plugins.autoloader){
     Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+}
+// ── Search highlight inside editor ──
+function highlightSearchInEditor(){
+    const editor=document.getElementById('editorContent');
+    // Remove previous highlights
+    editor.querySelectorAll('mark.editor-search-hl').forEach(m=>{
+        const parent=m.parentNode;
+        parent.replaceChild(document.createTextNode(m.textContent),m);
+        parent.normalize();
+    });
+    const q=document.getElementById('searchInput').value.trim().toLowerCase();
+    if(!q)return;
+    // Walk text nodes safely (no innerHTML manipulation)
+    const walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT,null);
+    const matches=[];
+    while(walker.nextNode()){
+        const node=walker.currentNode;
+        const text=node.textContent.toLowerCase();
+        let idx=text.indexOf(q);
+        while(idx!==-1){
+            matches.push({node,idx,len:q.length});
+            idx=text.indexOf(q,idx+q.length);
+        }
+    }
+    // Apply highlights in reverse so offsets stay valid
+    for(let i=matches.length-1;i>=0;i--){
+        const{node,idx,len}=matches[i];
+        const range=document.createRange();
+        range.setStart(node,idx);
+        range.setEnd(node,idx+len);
+        const mark=document.createElement('mark');
+        mark.className='editor-search-hl';
+        range.surroundContents(mark);
+    }
+    // Scroll to first match
+    const first=editor.querySelector('mark.editor-search-hl');
+    if(first)first.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function highlightCode(){
     document.querySelectorAll('#editorContent pre code[class*="language-"]').forEach(el=>{
