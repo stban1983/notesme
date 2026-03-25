@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.2] - 2026-25-03 - Functionality and fix Update
+
+- Enhanced search
+- Fix collapse folder
+
+Don't forget to clear your cache! 
+
+
 ## [1.2.1] - 2026-12-03 - Functionality and fix Update
 
 - You can sort your notes!
