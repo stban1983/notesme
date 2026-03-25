@@ -378,7 +378,16 @@ def search_notes_in_memory(db, user_id: int, query: str) -> list:
         plain_text = strip_html(plain_content)
         if query_lower in title.lower() or query_lower in plain_text.lower():
             d = dict(r)
-            d["preview"] = plain_text[:200]
+            # Build contextual snippet around first match in content
+            idx = plain_text.lower().find(query_lower)
+            if idx >= 0:
+                start = max(0, idx - 60)
+                end = min(len(plain_text), idx + len(query) + 60)
+                snippet = ("…" if start > 0 else "") + plain_text[start:end].strip() + ("…" if end < len(plain_text) else "")
+                d["preview"] = snippet
+            else:
+                d["preview"] = plain_text[:200]
+            d["search_query"] = query
             del d["content"]
             results.append(d)
     # Sort: pinned first, then by updated_at descending
