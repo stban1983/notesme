@@ -170,6 +170,7 @@
         .note-card.active::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--accent-grad);border-radius:0 4px 4px 0}
         .note-card-title{font-size:14px;font-weight:600;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.01em}
         .note-card-preview{font-size:12.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:6px;line-height:1.4}
+        .search-hl{background:var(--warning);color:var(--bg-primary);border-radius:2px;padding:0 1px;font-weight:600}
         .note-card-meta{font-size:11px;color:var(--text-ghost);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
         .note-card-pin{color:var(--warning);font-size:12px;display:flex;align-items:center}
         .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-ghost);text-align:center;padding:40px}
@@ -394,7 +395,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v1.2.1</div>
+					<div class="sidebar-version">v1.2.2</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -723,11 +724,20 @@ async function offlineLoadNotes(folderId, search) {
         return (b.updated_at || '').localeCompare(a.updated_at || '');
     });
 
-    // Return with preview
-    return allNotes.map(n => ({
-        ...n,
-        preview: stripHtmlClient(n.content || '').substring(0, 200)
-    }));
+    // Return with preview (contextual snippet if searching)
+    return allNotes.map(n => {
+        const plain = stripHtmlClient(n.content || '');
+        let preview = plain.substring(0, 200);
+        if (search) {
+            const idx = plain.toLowerCase().indexOf(search.toLowerCase());
+            if (idx >= 0) {
+                const start = Math.max(0, idx - 60);
+                const end = Math.min(plain.length, idx + search.length + 60);
+                preview = (start > 0 ? '…' : '') + plain.substring(start, end).trim() + (end < plain.length ? '…' : '');
+            }
+        }
+        return { ...n, preview, search_query: search || null };
+    });
 }
 
 // Simple client-side HTML stripper (mirrors server's strip_html)
@@ -1064,11 +1074,14 @@ function renderNotes(){
     const list=document.getElementById('noteList');
     if(!notes.length){list.innerHTML='<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><polyline points="14,2 14,8 20,8"/></svg></div><p>'+(isTrashView?'Trash is empty':'No notes')+'</p></div>';return;}
     const sorted=sortNotes(notes);
+    const searchQ=document.getElementById('searchInput').value.trim();
     list.innerHTML=sorted.map((n,i)=>{
-        const preview=(n.preview||'').substring(0,120);
+        const preview=(n.preview||'').substring(0,140);
+        let previewHtml=escHtml(preview||'Empty note');
+        if(searchQ){const esc=escHtml(searchQ);const re=new RegExp('('+esc.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');previewHtml=previewHtml.replace(re,'<mark class="search-hl">$1</mark>');}
         return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')" style="animation:fadeIn .3s ease '+(i*0.03)+'s both">'
             +'<div class="note-card-title">'+escHtml(n.title||'Untitled')+'</div>'
-            +'<div class="note-card-preview">'+escHtml(preview||'Empty note')+'</div>'
+            +'<div class="note-card-preview">'+previewHtml+'</div>'
             +'<div class="note-card-meta">'+(n.pinned?'<span class="note-card-pin">'+icon('pin','12px')+'</span>':'')+'<span>'+formatDate(n.updated_at)+'</span>'+(n.deleted_at?' <span style="color:var(--danger)">· Deleted</span>':'')+'</div></div>';
     }).join('');
 }
