@@ -40,6 +40,11 @@ password: notesme
   
 <br>
 <br>
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/B0B21WMVF0)
+
+<br>
+<br>
   
 ## Screenshots:
 
