@@ -135,7 +135,10 @@
         .folder-item:hover{background:var(--bg-hover);color:var(--text-primary)}
         .folder-item.active{background:var(--accent-glow);color:var(--accent-1);font-weight:600}
         .folder-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:60%;background:var(--accent-grad);border-radius:0 4px 4px 0}
-        .folder-item .fi{font-size:16px;flex-shrink:0;width:22px;text-align:center;opacity:0.8;display:flex;align-items:center;justify-content:center}
+        .folder-item .fi{font-size:16px;flex-shrink:0;width:22px;text-align:center;opacity:0.8;display:flex;align-items:center;justify-content:center;transition:transform 0.15s ease}
+        .folder-item.expanded>.fi{transform:rotate(90deg)}
+        .folder-item .fi.toggle{cursor:pointer;border-radius:4px}
+        .folder-item .fi.toggle:hover{background:var(--bg-hover)}
         .folder-item.active .fi{opacity:1}
         .folder-item .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .folder-item .fc{font-size:11px;color:var(--text-ghost);flex-shrink:0;background:var(--bg-elevated);padding:2px 8px;border-radius:10px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -512,6 +515,7 @@
 let token = localStorage.getItem('notes_token');
 let folders=[], notes=[], currentFolder='__all__', currentNote=null, saveTimeout=null, contextTarget=null;
 let isAdmin=false, isTrashView=false, folderCounts={};
+let collapsedFolders=new Set(JSON.parse(localStorage.getItem('collapsed_folders')||'[]'));
 let currentSort = localStorage.getItem('notes_sort') || 'updated_desc';
 let isOffline = !navigator.onLine;
 
@@ -936,20 +940,29 @@ function getFolderTotalCount(folderId) {
     return direct + children.reduce((sum, child) => sum + getFolderTotalCount(child.id), 0);
 }
 
+function toggleFolder(e,folderId){
+    e.stopPropagation();
+    if(collapsedFolders.has(folderId)){collapsedFolders.delete(folderId);}else{collapsedFolders.add(folderId);}
+    localStorage.setItem('collapsed_folders',JSON.stringify([...collapsedFolders]));
+    renderFolders();
+}
 function renderFolders(){
     const c=document.getElementById('foldersContainer');c.innerHTML='';
     const roots=folders.filter(f=>!f.parent_id);
     function rf(folder,depth=0){
         const nc=getFolderTotalCount(folder.id)||0;
         const d=document.createElement('div');
-        d.className='folder-item'+(currentFolder===folder.id?' active':'');
-        d.dataset.folder=folder.id;d.dataset.depth=depth;
-        d.onclick=(e)=>{if(!e.target.closest('.fa'))selectFolder(folder.id);};
-        d.oncontextmenu=(e)=>{e.preventDefault();showContextMenu(e,folder);};
         const hasSub=folders.some(f=>f.parent_id===folder.id);
-        d.innerHTML='<span class="fi">'+icon(hasSub?'chevron':'folder','16px')+'</span><span class="fn">'+escHtml(folder.name)+'</span><span class="fc">'+nc+'</span><div class="fa"><button onclick="event.stopPropagation();showContextMenu(event,folders.find(f=>f.id===\''+folder.id+'\'))" title="Options">'+icon('dots','14px')+'</button></div>';
+        const isExpanded=hasSub&&!collapsedFolders.has(folder.id);
+        d.className='folder-item'+(currentFolder===folder.id?' active':'')+(isExpanded?' expanded':'');
+        d.dataset.folder=folder.id;d.dataset.depth=depth;
+        d.onclick=(e)=>{if(!e.target.closest('.fa')&&!e.target.closest('.fi.toggle'))selectFolder(folder.id);};
+        d.oncontextmenu=(e)=>{e.preventDefault();showContextMenu(e,folder);};
+        d.innerHTML='<span class="fi'+(hasSub?' toggle':'')+'"'+(hasSub?' onclick="toggleFolder(event,\''+folder.id+'\')"':'')+'>'+icon(hasSub?'chevron':'folder','16px')+'</span><span class="fn">'+escHtml(folder.name)+'</span><span class="fc">'+nc+'</span><div class="fa"><button onclick="event.stopPropagation();showContextMenu(event,folders.find(f=>f.id===\''+folder.id+'\'))" title="Options">'+icon('dots','14px')+'</button></div>';
         c.appendChild(d);
-        folders.filter(f=>f.parent_id===folder.id).forEach(ch=>rf(ch,depth+1));
+        if(hasSub&&!collapsedFolders.has(folder.id)){
+            folders.filter(f=>f.parent_id===folder.id).forEach(ch=>rf(ch,depth+1));
+        }
     }
     roots.forEach(f=>rf(f));
 }
