@@ -2,7 +2,7 @@
 
 ## [1.2.2] - 2026-25-03 - Functionality and fix Update
 
-- Enhanced search
+- Add search term highlighting inside editor content
 - Fix collapse folder
 
 Don't forget to clear your cache! 
