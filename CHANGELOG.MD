@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.3] - 2026-17-04 - Fix refreshing notes
+
+- Fix: Removed list blinking while typing.
+- Local note update after saving (without server reload); fadeIn animation disabled on silent re-renderers.
+
+
 ## [1.2.2] - 2026-25-03 - Functionality and fix Update
 
 - Add search term highlighting inside editor content
