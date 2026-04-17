@@ -396,7 +396,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v1.2.2</div>
+					<div class="sidebar-version">v1.2.3</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -1016,7 +1016,7 @@ async function loadNotes(){
                 notes = await offlineLoadNotes(currentFolder, search);
             } catch { notes = []; }
         }
-        renderNotes();
+        renderNotes(true);
         document.getElementById('trashBar').classList.toggle('hidden',!isTrashView);
         document.getElementById('newNoteBtn').style.display='none';
         return;
@@ -1028,7 +1028,7 @@ async function loadNotes(){
     else if(currentFolder==='__none__')params.set('folder_id','__none__');
     else if(currentFolder!=='__all__')params.set('folder_id',currentFolder);
     const qs=params.toString();if(qs)path+='?'+qs;
-    notes=await api(path)||[];renderNotes();
+    notes=await api(path)||[];renderNotes(true);
     document.getElementById('trashBar').classList.toggle('hidden',!isTrashView);
     document.getElementById('newNoteBtn').style.display=isTrashView?'none':'';
 }
@@ -1071,7 +1071,7 @@ function sortNotes(arr){
     });
     return sorted;
 }
-function renderNotes(){
+function renderNotes(animate=false){
     const list=document.getElementById('noteList');
     if(!notes.length){list.innerHTML='<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><polyline points="14,2 14,8 20,8"/></svg></div><p>'+(isTrashView?'Trash is empty':'No notes')+'</p></div>';return;}
     const sorted=sortNotes(notes);
@@ -1080,7 +1080,8 @@ function renderNotes(){
         const preview=(n.preview||'').substring(0,140);
         let previewHtml=escHtml(preview||'Empty note');
         if(searchQ){const esc=escHtml(searchQ);const re=new RegExp('('+esc.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');previewHtml=previewHtml.replace(re,'<mark class="search-hl">$1</mark>');}
-        return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')" style="animation:fadeIn .3s ease '+(i*0.03)+'s both">'
+        const animStyle=animate?' style="animation:fadeIn .3s ease '+(i*0.03)+'s both"':'';
+        return '<div class="note-card'+(currentNote&&currentNote.id===n.id?' active':'')+'" onclick="selectNote(\''+n.id+'\')"'+animStyle+'>'
             +'<div class="note-card-title">'+escHtml(n.title||'Untitled')+'</div>'
             +'<div class="note-card-preview">'+previewHtml+'</div>'
             +'<div class="note-card-meta">'+(n.pinned?'<span class="note-card-pin">'+icon('pin','12px')+'</span>':'')+'<span>'+formatDate(n.updated_at)+'</span>'+(n.deleted_at?' <span style="color:var(--danger)">· Deleted</span>':'')+'</div></div>';
@@ -1189,9 +1190,17 @@ async function saveNote(){
             const m=inner.match(/<img[^>]*>/);return m?m[0]:'';
         });
         document.getElementById('editorSaveStatus').textContent='⟳ Saving...';
-        await api('/notes/'+currentNote.id,{method:'PUT',body:{title:document.getElementById('editorTitle').value||'Untitled',content:html}});
+        const updated=await api('/notes/'+currentNote.id,{method:'PUT',body:{title:document.getElementById('editorTitle').value||'Untitled',content:html}});
         document.getElementById('editorSaveStatus').textContent='✓ Saved';
-        refreshList();
+        if(updated){
+            currentNote.title=updated.title;
+            currentNote.updated_at=updated.updated_at;
+            const idx=notes.findIndex(n=>n.id===currentNote.id);
+            if(idx>=0){
+                notes[idx]={...notes[idx],title:updated.title,updated_at:updated.updated_at,preview:stripHtmlClient(html).substring(0,200)};
+                renderNotes();
+            }
+        }
     }catch(err){
         document.getElementById('editorSaveStatus').textContent='Error';
         console.error('Save failed:',err);
