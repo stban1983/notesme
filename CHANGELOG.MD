@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.0] - 2026-22-04 - Enhanced text editor
+
+- Add more styles
+- Fix: changinf format is now fixed
+
 ## [1.2.3] - 2026-17-04 - Fix refreshing notes
 
 - Fix: Removed list blinking while typing.
