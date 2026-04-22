@@ -460,7 +460,7 @@
             </div>
             <div class="format-bar" id="formatBar">
                 <select class="format-select" id="blockFormat" onchange="execBlock(this.value);this.selectedIndex=0;">
-                    <option value="">Style</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option>
+                    <option value="">Style</option><option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="blockquote">Quote</option><option value="pre">Code</option>
                 </select>
                 <div class="format-sep"></div>
                 <button class="format-btn" onclick="execCmd('bold')" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -1331,7 +1331,27 @@ async function restoreVersionById(vid){
 // WYSIWYG
 // ══════════════════════════════════════════
 function execCmd(cmd,val){document.getElementById('editorContent').focus();document.execCommand(cmd,false,val||null);scheduleSave();updateFormatState();}
-function execBlock(tag){if(!tag)return;document.getElementById('editorContent').focus();document.execCommand('formatBlock',false,tag);scheduleSave();}
+function execBlock(tag){
+    if(!tag)return;
+    const ed=document.getElementById('editorContent');
+    ed.focus();
+    const sel=window.getSelection();
+    if(sel.rangeCount){
+        let n=sel.anchorNode,container=null;
+        while(n&&n!==ed){
+            if(n.nodeType===1&&(n.tagName==='BLOCKQUOTE'||n.tagName==='PRE')){container=n;break;}
+            n=n.parentNode;
+        }
+        if(container&&container.tagName.toLowerCase()!==tag){
+            const parent=container.parentNode;
+            const frag=document.createDocumentFragment();
+            while(container.firstChild)frag.appendChild(container.firstChild);
+            parent.replaceChild(frag,container);
+        }
+    }
+    document.execCommand('formatBlock',false,tag);
+    scheduleSave();
+}
 function applyColor(c){document.getElementById('colorSwatch').style.background=c;document.getElementById('editorContent').focus();document.execCommand('foreColor',false,c);scheduleSave();}
 function applyHighlight(){document.getElementById('editorContent').focus();document.execCommand('hiliteColor',false,'rgba(108,92,231,0.2)');scheduleSave();}
 function removeFormat(){document.getElementById('editorContent').focus();document.execCommand('removeFormat',false,null);scheduleSave();}
