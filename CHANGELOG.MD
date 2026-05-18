@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-18-05 - migrate to last LTS python alpine image
+
+- python:3.12-alpine to python:3.13-alpine
+
+
 ## [1.3.0] - 2026-22-04 - Enhanced text editor
 
 - Add more styles
