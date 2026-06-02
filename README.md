@@ -181,7 +181,7 @@ All variables are defined in the `.env` file:
 
 | Variable | Default | Description |
 |---|---|---|
-| `USERNAME` | `admin` | Initial admin account username |
+| `ADMIN_USERNAME` | `admin` | Initial admin account username (`USERNAME` still accepted as fallback) |
 | `PASSWORD` | `admin` | Initial account password — **change this** |
 | `SECRET_KEY` | *(auto)* | JWT signing key (auto-generated if empty) |
 | `ENCRYPTION_KEY` | *(empty)* | Fernet key for note encryption (optional) |

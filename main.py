@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import uuid
 import html as html_module
 import hashlib
@@ -9,16 +10,14 @@ import base64
 import json
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from collections import defaultdict
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, Query
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import jwt
 from cryptography.fernet import Fernet
 import nh3
@@ -38,7 +37,9 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 DB_PATH = os.path.join(DATA_DIR, "notes.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "") or secrets.token_hex(32)
 ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY", "")
-DEFAULT_USERNAME = os.environ.get("USERNAME", "admin")
+# ADMIN_USERNAME is preferred; USERNAME kept as a fallback for backward compat
+# (note: USERNAME is also a standard OS-provided variable, hence the rename)
+DEFAULT_USERNAME = os.environ.get("ADMIN_USERNAME") or os.environ.get("USERNAME") or "admin"
 DEFAULT_PASSWORD = os.environ.get("PASSWORD", "admin")
 TOKEN_EXPIRY_HOURS = int(os.environ.get("TOKEN_EXPIRY_HOURS", "72"))
 TRASH_RETENTION_DAYS = int(os.environ.get("TRASH_RETENTION_DAYS", "30"))
@@ -47,6 +48,21 @@ MAX_VERSIONS_PER_NOTE = int(os.environ.get("MAX_VERSIONS_PER_NOTE", "50"))
 MAX_UPLOAD_SIZE = int(os.environ.get("MAX_UPLOAD_SIZE", str(10 * 1024 * 1024)))  # 10 MB
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def _startup_warnings():
+    """Warn loudly about insecure configuration at boot (self-hosted defaults)."""
+    if not os.environ.get("SECRET_KEY"):
+        print("⚠️  SECRET_KEY non défini : une clé éphémère est générée à chaque démarrage. "
+              "Les jetons de session seront invalidés à chaque redémarrage et échoueront avec "
+              "plusieurs workers uvicorn. Définissez SECRET_KEY en production.", file=sys.stderr)
+    if not ENCRYPTION_KEY:
+        print("⚠️  ENCRYPTION_KEY non défini : les notes sont stockées EN CLAIR sur le disque.",
+              file=sys.stderr)
+    if DEFAULT_PASSWORD == "admin":
+        print("⚠️  Mot de passe administrateur par défaut ('admin') : changez PASSWORD "
+              "immédiatement.", file=sys.stderr)
+
+_startup_warnings()
 
 # ─── Reverse Proxy Config ───
 # Set to the number of trusted reverse proxies in front of the app (e.g. 1 for Nginx/Traefik)
@@ -132,9 +148,14 @@ _login_attempts: dict[str, list[float]] = defaultdict(list)
 def check_rate_limit(ip: str):
     now = time.time()
     cutoff = now - LOGIN_WINDOW_SEC
-    _login_attempts[ip] = [t for t in _login_attempts[ip] if t > cutoff]
-    if len(_login_attempts[ip]) >= LOGIN_MAX_ATTEMPTS:
-        wait = int(_login_attempts[ip][0] + LOGIN_WINDOW_SEC - now) + 1
+    # Use .get to avoid materializing an empty list for every IP that ever hits login
+    attempts = [t for t in _login_attempts.get(ip, []) if t > cutoff]
+    if attempts:
+        _login_attempts[ip] = attempts
+    else:
+        _login_attempts.pop(ip, None)  # prune empty entries (prevents unbounded growth)
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        wait = int(attempts[0] + LOGIN_WINDOW_SEC - now) + 1
         raise HTTPException(429, f"Trop de tentatives. Réessayez dans {wait}s")
 
 def record_failed_login(ip: str):
@@ -390,10 +411,8 @@ def search_notes_in_memory(db, user_id: int, query: str) -> list:
             d["search_query"] = query
             del d["content"]
             results.append(d)
-    # Sort: pinned first, then by updated_at descending
-    results.sort(key=lambda x: (-int(x.get("pinned", 0)), x.get("updated_at", "")), reverse=False)
-    results.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-    results.sort(key=lambda x: -int(x.get("pinned", 0)))
+    # Sort once: pinned first, then by updated_at descending
+    results.sort(key=lambda x: (int(x.get("pinned", 0)), x.get("updated_at", "")), reverse=True)
     return results
 
 init_db()
@@ -557,6 +576,24 @@ def update_folder(folder_id: str, req: FolderUpdate, user=Depends(get_current_us
     if req.name is not None:
         db.execute("UPDATE folders SET name = ? WHERE id = ?", (sanitize_text(req.name), folder_id))
     if req.parent_id != "__unchanged__":
+        if req.parent_id:
+            if req.parent_id == folder_id:
+                db.close()
+                raise HTTPException(400, "Un dossier ne peut pas être son propre parent")
+            parent = db.execute("SELECT id FROM folders WHERE id = ? AND user_id = ?",
+                                (req.parent_id, user["user_id"])).fetchone()
+            if not parent:
+                db.close()
+                raise HTTPException(404, "Dossier parent introuvable")
+            # Prevent cycles: the new parent must not be a descendant of this folder
+            ancestor, seen = req.parent_id, set()
+            while ancestor and ancestor not in seen:
+                if ancestor == folder_id:
+                    db.close()
+                    raise HTTPException(400, "Déplacement invalide (cycle de dossiers)")
+                seen.add(ancestor)
+                row = db.execute("SELECT parent_id FROM folders WHERE id = ?", (ancestor,)).fetchone()
+                ancestor = row["parent_id"] if row else None
         db.execute("UPDATE folders SET parent_id = ? WHERE id = ?", (req.parent_id, folder_id))
     db.commit()
     folder = db.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
@@ -625,6 +662,13 @@ def list_notes(folder_id: Optional[str] = None, search: Optional[str] = None,
 @app.post("/api/notes")
 def create_note(req: NoteCreate, user=Depends(get_current_user)):
     db = get_db()
+    # Verify the target folder belongs to the user (prevents cross-user folder assignment)
+    if req.folder_id:
+        owns = db.execute("SELECT id FROM folders WHERE id = ? AND user_id = ?",
+                          (req.folder_id, user["user_id"])).fetchone()
+        if not owns:
+            db.close()
+            raise HTTPException(404, "Dossier introuvable")
     nid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     safe_title = sanitize_text(req.title or "Sans titre")
@@ -671,6 +715,12 @@ def update_note(note_id: str, req: NoteUpdate, user=Depends(get_current_user)):
         enc = encrypt_content(safe_content)
         db.execute("UPDATE notes SET content=?, updated_at=? WHERE id=?", (enc, now, note_id))
     if req.folder_id != "__unchanged__":
+        if req.folder_id:
+            owns = db.execute("SELECT id FROM folders WHERE id = ? AND user_id = ?",
+                              (req.folder_id, user["user_id"])).fetchone()
+            if not owns:
+                db.close()
+                raise HTTPException(404, "Dossier introuvable")
         db.execute("UPDATE notes SET folder_id=?, updated_at=? WHERE id=?", (req.folder_id, now, note_id))
     if req.pinned is not None:
         db.execute("UPDATE notes SET pinned=?, updated_at=? WHERE id=?", (int(req.pinned), now, note_id))
@@ -859,7 +909,9 @@ def get_image(filename: str):
     safe_name = os.path.basename(filename)
     fp = os.path.join(UPLOAD_DIR, safe_name)
     real_path = os.path.realpath(fp)
-    if not real_path.startswith(os.path.realpath(UPLOAD_DIR)):
+    upload_root = os.path.realpath(UPLOAD_DIR)
+    # commonpath avoids the sibling-prefix bug of startswith (e.g. /uploads vs /uploads_evil)
+    if os.path.commonpath([real_path, upload_root]) != upload_root:
         raise HTTPException(403, "Accès interdit")
     if not os.path.exists(real_path):
         raise HTTPException(404)
@@ -879,7 +931,7 @@ def sync_all(request: Request, user=Depends(get_current_user)):
         "SELECT MAX(updated_at) as m FROM notes WHERE user_id = ? AND deleted_at IS NULL", (uid,)
     ).fetchone()
     etag_source = (latest["m"] or "") + str(db.execute("SELECT COUNT(*) as c FROM notes WHERE user_id=?", (uid,)).fetchone()["c"])
-    etag = '"' + hashlib.md5(etag_source.encode()).hexdigest()[:16] + '"'
+    etag = '"' + hashlib.md5(etag_source.encode(), usedforsecurity=False).hexdigest()[:16] + '"'
     if_none_match = request.headers.get("If-None-Match", "")
     if if_none_match == etag:
         db.close()
