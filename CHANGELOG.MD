@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0] - 2026-06-02 - Security hardening & maintenance
+
+### Security
+- Dependencies upgraded to current releases (notably `python-multipart` 0.0.9 → 0.0.30, which fixes a known DoS advisory; also FastAPI, uvicorn, cryptography, PyJWT, argon2-cffi, nh3).
+- Subresource Integrity (SRI) hashes added to the DOMPurify and Prism CDN scripts — protects against a compromised CDN tampering with the client-side XSS sanitizer.
+- Folder/note ownership is now validated server-side: a note or sub-folder can no longer be attached to another user's folder, and folder moves that would create a cycle are rejected.
+- Path-traversal guard on image serving hardened (`commonpath` instead of prefix match).
+- Startup warnings when `SECRET_KEY`/`ENCRYPTION_KEY` are missing or the default admin password is still in use.
+
+### Changed
+- `USERNAME` environment variable renamed to `ADMIN_USERNAME` to avoid collision with the OS-provided `USERNAME` variable. `USERNAME` is still honored as a fallback, so existing setups keep working.
+
+### Internal
+- Login rate-limiter no longer grows unbounded in memory; search result sorting simplified to a single pass; dead imports removed.
+
 ## [1.3.1] - 2026-18-05 - migrate to last LTS python alpine image
 
 - python:3.12-alpine to python:3.13-alpine
