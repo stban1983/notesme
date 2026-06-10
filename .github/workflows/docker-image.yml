@@ -8,7 +8,7 @@ on:
         description: 'Tag Docker manuel (ex: test-ui, beta)'
         required: true
         default: 'dev'
-        
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
