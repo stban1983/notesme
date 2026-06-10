@@ -161,8 +161,8 @@
 
         /* ═══ NOTE LIST ═══ */
         .note-list-panel{width:var(--notelist-w);min-width:var(--notelist-w);border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-base)}
-        .note-list-header{padding:24px 20px 16px;display:flex;align-items:center;justify-content:space-between}
-        .note-list-header h3{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+        .note-list-header{padding:24px 20px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+        .note-list-header h3{font-size:18px;font-weight:700;letter-spacing:-0.02em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .note-list{flex:1;overflow-y:auto;padding:0 10px 10px}
         .note-card{padding:14px 16px;border-radius:var(--radius-md);cursor:pointer;transition:all var(--tr);margin-bottom:4px;border:1px solid transparent;position:relative}
         .note-card:hover{background:var(--bg-surface);border-color:var(--border)}
@@ -406,11 +406,11 @@
         <!-- Note list -->
         <div class="note-list-panel">
             <div class="note-list-header">
-                <div style="display:flex;align-items:center;gap:30px">
+                <div style="display:flex;align-items:center;gap:30px;flex:1;min-width:0">
                     <button class="btn-icon mobile-menu-btn" onclick="toggleSidebar()"><span class="i"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span></button>
                     <h3 id="currentFolderName">All notes</h3>
                 </div>
-                <div style="display:flex;align-items:center;gap:14px">
+                <div style="display:flex;align-items:center;gap:14px;flex-shrink:0">
                     <div class="sort-wrapper">
                         <button class="sort-btn" onclick="toggleSortMenu()" title="Sort notes">
                             <span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h7"/><path d="M3 12h10"/><path d="M3 18h5"/><path d="M18 20V4"/><polyline points="15,7 18,4 21,7"/></svg></span>
@@ -1536,9 +1536,26 @@ function selectFolder(id){
     document.querySelectorAll('.folder-item').forEach(el=>el.classList.toggle('active',el.dataset.folder===id));
     const names={'__all__':'All notes','__none__':'Uncategorized','__trash__':'Trash'};
     document.getElementById('currentFolderName').textContent=names[id]||(folders.find(f=>f.id===id)||{}).name||'Notes';
+    adjustNoteListWidth();
     closeSidebarUI();   // close sidebar on mobile without touching history (sidebar was opened → user taps folder → no history entry for sidebar)
     loadNotes();showEditorEmpty();
 }
+// Widen the note-list panel just enough to fit a long folder title instead of clipping it.
+// Bounded at half the viewport; beyond that the title falls back to the ellipsis (CSS).
+function adjustNoteListWidth(){
+    const panel=document.querySelector('.note-list-panel');
+    const h3=document.getElementById('currentFolderName');
+    if(!panel||!h3)return;
+    panel.style.width='';panel.style.minWidth='';        // reset to CSS default before measuring
+    if(window.innerWidth<=900)return;                    // mobile: panel is full-width, leave it
+    const overflow=h3.scrollWidth-h3.clientWidth;        // scrollWidth = full title even while clipped
+    if(overflow>1){
+        const base=panel.getBoundingClientRect().width;  // CSS default (~320px)
+        const target=Math.min(base+overflow+2,Math.round(window.innerWidth*0.5));
+        if(target>base){panel.style.width=target+'px';panel.style.minWidth=target+'px';}
+    }
+}
+window.addEventListener('resize',adjustNoteListWidth);
 function updateFolderSelect(){
     const s=document.getElementById('noteFolderSelect');
     s.innerHTML='<option value="">Uncategorized</option>'+folders.map(f=>'<option value="'+f.id+'">'+escHtml(f.name)+'</option>').join('');
