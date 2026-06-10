@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0] - 2026-06-10 - Markdown import
+
+### Added
+- **Import Markdown notes.** A new import button (next to "new note") lets you bring in one or more `.md` / `.markdown` files at once — each file becomes a note, named after its filename, in the currently selected folder. Markdown is converted to rich text on the fly (headings, lists, tables, task lists, code blocks, quotes, links).
+- **Image import.** Select your `.md` files together with their referenced images and they'll be uploaded and re-hosted automatically, so they display inline (and aren't blocked by the Content-Security-Policy). Images matched by filename.
+
+### Security
+- Imported content goes through the same defenses as everything else: client-side DOMPurify, then server-side nh3 sanitization and at-rest encryption. The new `marked` Markdown library is loaded from CDN with a Subresource Integrity (SRI) hash.
+
 ## [1.4.0] - 2026-06-02 - Security hardening & maintenance
 
 ### Security

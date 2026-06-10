@@ -339,6 +339,7 @@
 <script>window.Prism=window.Prism||{};Prism.manual=true;</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha384-06z5D//U/xpvxZHuUz92xBvq3DqBBFi7Up53HRrbV7Jlv7Yvh/MZ7oenfUe9iCEt" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js" integrity="sha384-Uq05+JLko69eOiPr39ta9bh7kld5PKZoU+fF7g0EXTAriEollhZ+DrN8Q/Oi8J2Q" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/16.3.0/lib/marked.umd.min.js" integrity="sha512-V6rGY7jjOEUc7q5Ews8mMlretz1Vn2wLdMW/qgABLWunzsLfluM0FwHuGjGQ1lc8jO5vGpGIGFE+rTzB+63HdA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <!-- ═══ LOGIN ═══ -->
@@ -426,6 +427,7 @@
                             <button onclick="changeSort('title_desc')"><span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h14"/><path d="M3 12h10"/><path d="M3 18h7"/></svg></span> Title Z → A<span class="sort-check i"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></span></button>
                         </div>
                     </div>
+                    <label class="btn-icon" id="importBtn" title="Import Markdown (.md + images)" style="cursor:pointer"><span class="i"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,9 12,4 17,9"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span><input type="file" id="mdImportInput" accept=".md,.markdown,text/markdown,image/*" style="display:none" multiple></label>
                     <button class="btn-icon" id="newNoteBtn" onclick="createNote()" title="New note" style="background:var(--accent-glow);color:var(--accent-1)"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
                 </div>
             </div>
@@ -1092,6 +1094,69 @@ async function createNote(){
     const fid=currentFolder!=='__all__'&&currentFolder!=='__none__'&&currentFolder!=='__trash__'?currentFolder:null;
     const note=await api('/notes',{method:'POST',body:{title:'Untitled',content:'',folder_id:fid}});
     if(note){await loadNotes();await loadStats();selectNote(note.id);document.getElementById('editorTitle').focus();document.getElementById('editorTitle').select();}
+}
+
+// ══════════════════════════════════════════
+// IMPORT (Markdown files → notes)
+// ══════════════════════════════════════════
+document.getElementById('mdImportInput').addEventListener('change',async(e)=>{
+    const files=Array.from(e.target.files||[]);
+    e.target.value='';
+    await importMarkdownFiles(files);
+});
+async function importMarkdownFiles(files){
+    if(isOffline){toast('Offline — read only');return;}
+    if(typeof marked==='undefined'){toast('Markdown library unavailable');return;}
+    const mdFiles=files.filter(f=>/\.(md|markdown)$/i.test(f.name));
+    if(!mdFiles.length){toast('Select at least one .md file');return;}
+    // Index images chosen alongside the notes, keyed by lowercased filename (basename match)
+    const imageFiles={};
+    for(const f of files){if(f.type.startsWith('image/'))imageFiles[f.name.toLowerCase()]=f;}
+    // New notes land in the currently selected folder, like createNote()
+    const fid=currentFolder!=='__all__'&&currentFolder!=='__none__'&&currentFolder!=='__trash__'?currentFolder:null;
+    toast('Importing '+mdFiles.length+' file'+(mdFiles.length>1?'s':'')+'…');
+    let ok=0,fail=0;
+    for(const file of mdFiles){
+        try{
+            const title=file.name.replace(/\.(md|markdown)$/i,'').trim()||'Untitled';
+            // marked → HTML, then DOMPurify (the server re-sanitizes + encrypts on save)
+            const clientHtml=sanitize(marked.parse(await file.text()));
+            const note=await api('/notes',{method:'POST',body:{title,content:clientHtml,folder_id:fid}});
+            if(!note){fail++;continue;}
+            const finalHtml=await rehostImportedImages(note.id,clientHtml,imageFiles);
+            if(finalHtml!==null)await api('/notes/'+note.id,{method:'PUT',body:{content:finalHtml}});
+            ok++;
+        }catch(err){console.error('Import failed:',file.name,err);fail++;}
+    }
+    await loadFolders();await loadNotes();await loadStats();
+    toast(ok+' note'+(ok!==1?'s':'')+' imported'+(fail?' • '+fail+' failed':''));
+}
+// Upload local images referenced by an imported note (matched by filename) and rewrite
+// their src to the same-origin /api/images URL (CSP-safe). Returns rewritten HTML, or null
+// if nothing was rehosted. Matching is done against the client HTML, which still holds the
+// original relative paths regardless of how nh3 normalises them server-side.
+async function rehostImportedImages(noteId,html,imageFiles){
+    if(!Object.keys(imageFiles).length)return null;
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const uploaded={};
+    let changed=false;
+    for(const img of doc.querySelectorAll('img')){
+        const src=img.getAttribute('src')||'';
+        if(/^(https?:|data:|blob:)/i.test(src))continue; // keep absolute/inline images as-is
+        const base=decodeURIComponent((src.split(/[?#]/)[0].split('/').pop()||'')).toLowerCase();
+        if(!base)continue;
+        let url=uploaded[base];
+        if(url===undefined){
+            const f=imageFiles[base];
+            if(!f){uploaded[base]=null;continue;} // referenced image not in the selection
+            const form=new FormData();form.append('file',f);
+            try{const res=await api('/notes/'+noteId+'/images',{method:'POST',body:form});url=res&&res.url?res.url:null;}
+            catch{url=null;}
+            uploaded[base]=url;
+        }
+        if(url){img.setAttribute('src',url);changed=true;}
+    }
+    return changed?sanitize(doc.body.innerHTML):null;
 }
 async function flushSave(){
     if(saveTimeout){clearTimeout(saveTimeout);saveTimeout=null;await saveNote();}
