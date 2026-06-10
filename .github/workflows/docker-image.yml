@@ -8,11 +8,6 @@ on:
         description: 'Tag Docker manuel (ex: test-ui, beta)'
         required: true
         default: 'dev'
-        
-  # 2. DÉCLENCHEUR AUTOMATIQUE (Uniquement pour les Releases)
-  push:
-    tags:
-      - 'v*.*.*'
 
 jobs:
   build-and-push:
