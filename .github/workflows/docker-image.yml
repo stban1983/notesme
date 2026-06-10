@@ -9,11 +9,6 @@ on:
         required: true
         default: 'dev'
         
-  # 2. DÉCLENCHEUR AUTOMATIQUE (Uniquement pour les Releases)
-  push:
-    tags:
-      - 'v*.*.*'
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
