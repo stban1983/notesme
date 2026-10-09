@@ -299,13 +299,13 @@ Custom connectors are called from Anthropic's cloud, so your instance must be re
 ### Behind a reverse proxy
 
 - Forward the `Authorization` header and don't redirect `/mcp`.
-- Set `TRUSTED_PROXY_COUNT=1` so the brute-force limiter sees the real client IPs.
+- Set `TRUSTED_PROXY_COUNT=1` so the invalid-token limiter sees the real client IPs.
 - Requests with an `Origin` header (browser-based clients) are only accepted from the origin of `MCP_PUBLIC_URL` and from `MCP_ALLOWED_ORIGINS`.
 
 ### Security notes
 
 - Tokens are 256-bit random secrets stored as SHA-256 hashes. Revoke them from **MCP access**; deleting a user deletes their tokens.
-- Each token is limited to `MCP_RATE_LIMIT` requests per minute. After 20 invalid tokens from the same IP within `LOGIN_WINDOW_SEC`, that IP is temporarily blocked.
+- Each token is limited to `MCP_RATE_LIMIT` requests per minute. After 20 invalid tokens from the same IP within `LOGIN_WINDOW_SEC`, further invalid tokens from that IP get HTTP 429 (valid tokens are never blocked).
 - Notes may contain text imported from the web (share target). The assistant receives it as data, but as with any AI tool, beware of prompt injection.
 
 ---

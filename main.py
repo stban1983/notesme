@@ -1078,10 +1078,14 @@ def _jsonrpc_error(req_id, code: int, message: str, data=None) -> dict:
     return {"jsonrpc": "2.0", "id": req_id, "error": err}
 
 # ── Text helpers ──
+# Diacritics dropped for accent-insensitive matching (Latin/Greek/Cyrillic accents once NFKD-decomposed).
+# Marks of other scripts (Devanagari or Thai vowel signs, Japanese dakuten…) are kept: they change the word.
+_DIACRITICS = dict.fromkeys([*range(0x0300, 0x0370), *range(0x1AB0, 0x1B00), *range(0x1DC0, 0x1E00),
+                             *range(0x20D0, 0x2100), *range(0xFE20, 0xFE30)])
+
 def _fold(text: str) -> str:
     """Case- and accent-insensitive form used for matching (é → e, ß → ss)."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+    return unicodedata.normalize("NFKD", text).casefold().translate(_DIACRITICS)
 
 def _fold_with_index(text: str):
     """Like _fold, plus, for each folded char, the index of the original char it comes from."""
@@ -1093,11 +1097,23 @@ def _fold_with_index(text: str):
     return "".join(out), idx
 
 def _search_terms(query: str) -> list:
-    words = re.findall(r"\w+", _fold(query))
-    terms = [w for w in words if len(w) > 1] or words
+    """Folded words of the query (runs of letters, marks and digits). Single ASCII characters
+    (l', a, y…) are dropped unless nothing else is left; single CJK characters are kept."""
+    words, cur = [], []
+    for ch in _fold(query):
+        if unicodedata.category(ch)[0] in "LMN":
+            cur.append(ch)
+        elif cur:
+            words.append("".join(cur))
+            cur = []
+    if cur:
+        words.append("".join(cur))
+    terms = [w for w in words if len(w) > 1 or not w.isascii()] or words
     return list(dict.fromkeys(terms))[:20]
 
 _PLAIN_BREAK_RE = re.compile(r"<br\s*/?>|</(?:p|div|li|h[1-6]|tr|pre|blockquote|ul|ol|table)\s*>", re.I)
+# A tag, quoted attribute values included (nh3 keeps ">" unescaped inside them, e.g. alt="a > b")
+_TAG_RE = re.compile(r"""<(?:"[^"]*"|'[^']*'|[^'">])*>""")
 
 def _html_to_plain(html_text: str) -> str:
     """Fast HTML → plain text, used for search matching, snippets and previews."""
@@ -1105,7 +1121,7 @@ def _html_to_plain(html_text: str) -> str:
         return ""
     text = _PLAIN_BREAK_RE.sub("\n", html_text)
     text = re.sub(r"</t[dh]\s*>", " ", text, flags=re.I)
-    text = html_module.unescape(re.sub(r"<[^>]*>", "", text))
+    text = html_module.unescape(_TAG_RE.sub("", text))
     text = re.sub(r"[^\S\n]+", " ", text)
     return re.sub(r"\s*\n\s*", "\n", text).strip()
 
@@ -1127,23 +1143,30 @@ def _mcp_date(value) -> str:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-def _mcp_snippet(body: str, terms: list, width: int = 220) -> str:
-    """Excerpt of body around the earliest matching term."""
+def _mcp_snippet(body: str, body_f: str, terms: list, width: int = 220) -> str:
+    """Excerpt of body around the earliest matching term (body_f is _fold(body))."""
     if not body:
         return ""
-    folded, idx = _fold_with_index(body)
-    pos = -1
-    for t in terms:
-        p = folded.find(t)
-        if p >= 0 and (pos < 0 or p < pos):
-            pos = p
-    start = max(0, idx[pos] - 80) if pos >= 0 else 0
+    hits = [p for p in (body_f.find(t) for t in terms) if p >= 0]
+    start = 0
+    if hits:
+        pos = min(hits)
+        # Folding usually keeps the length (é → e): positions match. Otherwise (ß → ss, ligatures,
+        # Hangul…) map the folded position back to the original text char by char.
+        if len(body_f) != len(body):
+            idx = _fold_with_index(body)[1]
+            pos = idx[min(pos, len(idx) - 1)]
+        start = max(0, pos - 80)
     end = min(len(body), start + width)
     text = " ".join(body[start:end].split())
     return ("…" if start > 0 else "") + text + ("…" if end < len(body) else "")
 
 # ── HTML → Markdown (structure-preserving, for get_note) ──
-_MD_INDENT = ""  # placeholder for list indentation, survives whitespace cleanup
+_MD_INDENT = "\ue000"  # placeholder for list indentation, survives whitespace cleanup
+_MD_CODE = "\ue001"    # code blocks stand as \ue001<n>\ue001 until the end, so cleanup never touches them
+_MD_CODE_RE = re.compile("\ue001(\\d+)\ue001")
+_MD_PRE_BLOCKS = {"div", "p", "li", "tr", "section", "article", "blockquote", "ul", "ol", "table",
+                  "h1", "h2", "h3", "h4", "h5", "h6"}
 
 class _HtmlNode:
     __slots__ = ("tag", "attrs", "children")
@@ -1177,39 +1200,70 @@ class _HtmlTreeBuilder(HTMLParser):
     def handle_data(self, data):
         self.stack[-1].children.append(data)
 
+def _longest_backtick_run(text: str) -> int:
+    return max(map(len, re.findall(r"`+", text)), default=0)
+
 def _md_wrap(text: str, mark: str) -> str:
-    lead, core, trail = re.match(r"^(\s*)(.*?)(\s*)$", text, re.S).groups()
-    return f"{lead}{mark}{core}{mark}{trail}" if core else text
+    """Wrap the non-blank part of text in mark, leaving the surrounding whitespace outside (linear time)."""
+    core = text.strip()
+    if not core:
+        return text
+    start, end = len(text) - len(text.lstrip()), len(text.rstrip())
+    return f"{text[:start]}{mark}{core}{mark}{text[end:]}"
+
+def _md_code_span(text: str) -> str:
+    """Inline code, fenced with more backticks than any run it contains."""
+    core = text.strip()
+    if not core:
+        return text
+    start, end = len(text) - len(text.lstrip()), len(text.rstrip())
+    fence = "`" * (_longest_backtick_run(core) + 1)
+    pad = " " if core.startswith("`") or core.endswith("`") else ""
+    return f"{text[:start]}{fence}{pad}{core}{pad}{fence}{text[end:]}"
 
 def _md_cleanup(text: str) -> str:
-    parts = text.split("```")
-    for i in range(0, len(parts), 2):  # even parts are outside code blocks
-        p = re.sub(r"[ \t]+\n", "\n", parts[i])
-        p = re.sub(r"\n[ \t]+", "\n", p)
-        parts[i] = re.sub(r"\n{3,}", "\n\n", p)
-    return "```".join(parts).strip()
+    """Trim spaces around line breaks and collapse blank lines (code blocks are still placeholders)."""
+    text = "\n".join(line.strip(" \t") for line in text.split("\n"))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
-def _md_children(node, pre: bool, depth: int) -> str:
-    return "".join(_md_node(c, pre, depth) for c in node.children)
+def _md_expand(text: str, codes: list) -> str:
+    return _MD_CODE_RE.sub(lambda m: codes[int(m.group(1))], text)
 
-def _md_table(node, depth: int) -> str:
+def _md_children(node, pre: bool, depth: int, codes: list) -> str:
+    out = []
+    for child in node.children:
+        s = _md_node(child, pre, depth, codes)
+        if pre and not isinstance(child, str) and child.tag in _MD_PRE_BLOCKS:
+            # Inside a code block, a block element is a line of its own
+            if out and not out[-1].endswith("\n"):
+                out.append("\n")
+            if s and not s.endswith("\n"):
+                s += "\n"
+        elif not pre and out and s.startswith(" ") and out[-1].endswith(" "):
+            s = s[1:]  # no double space where inline pieces meet ("[image] " + " text")
+        if s:
+            out.append(s)
+    return "".join(out)
+
+def _md_table(node, depth: int, codes: list) -> str:
     rows = []
     for child in node.children:
         if isinstance(child, str):
             continue
         trs = [child] if child.tag == "tr" else [c for c in child.children if not isinstance(c, str) and c.tag == "tr"]
         for tr in trs:
-            cells = [" ".join(_md_children(c, False, depth).split()).replace("|", "\\|")
+            cells = [" ".join(_md_expand(_md_children(c, False, depth, codes), codes).split()).replace("|", "\\|")
                      for c in tr.children if not isinstance(c, str) and c.tag in ("td", "th")]
             if cells:
                 rows.append(cells)
     if not rows:
         return ""
-    lines = ["| " + " | ".join(cells) + " |" for cells in rows]
-    lines.insert(1, "|" + " --- |" * len(rows[0]))
+    width = max(map(len, rows))  # ragged rows are padded: Markdown needs the same cell count everywhere
+    lines = ["| " + " | ".join(cells + [""] * (width - len(cells))) + " |" for cells in rows]
+    lines.insert(1, "|" + " --- |" * width)
     return "\n\n" + "\n".join(lines) + "\n\n"
 
-def _md_node(node, pre: bool = False, depth: int = 0) -> str:
+def _md_node(node, pre: bool, depth: int, codes: list) -> str:
     if isinstance(node, str):
         return node if pre else re.sub(r"\s+", " ", node)
     tag, attrs = node.tag, node.attrs
@@ -1217,21 +1271,25 @@ def _md_node(node, pre: bool = False, depth: int = 0) -> str:
         return ""
     if tag == "br":
         return "\n"
-    if tag == "hr":
-        return "\n\n---\n\n"
     if tag == "img":  # never output image URLs (data: URIs can be huge)
         alt = " ".join(attrs.get("alt", "").split())
-        return f"[image: {alt}]" if alt else "[image]"
+        return f"[image: {alt}] " if alt else "[image] "
     if tag == "input":
         if attrs.get("type", "").lower() == "checkbox":
             return "[x] " if "checked" in attrs else "[ ] "
         return ""
+    if pre:  # inside a code block: keep the text, drop the markup
+        return "\n" if tag == "hr" else _md_children(node, True, depth, codes)
+    if tag == "hr":
+        return "\n\n---\n\n"
     if tag == "pre":
         lang = attrs.get("data-lang", "").strip()
         if lang == "plaintext" or not re.fullmatch(r"[\w+#.-]{1,30}", lang):
             lang = ""
-        code = _md_children(node, True, depth).strip("\n")
-        return f"\n\n```{lang}\n{code}\n```\n\n"
+        code = _md_children(node, True, depth, codes).strip("\n")
+        fence = "`" * max(3, _longest_backtick_run(code) + 1)
+        codes.append(f"{fence}{lang}\n{code}\n{fence}")
+        return f"\n\n{_MD_CODE}{len(codes) - 1}{_MD_CODE}\n\n"
     if tag in ("ul", "ol"):
         items, n = [], 0
         for child in node.children:
@@ -1242,14 +1300,14 @@ def _md_node(node, pre: bool = False, depth: int = 0) -> str:
             if child.tag == "li":
                 n += 1
                 marker = f"{n}." if tag == "ol" else "-"
-                items.append(_MD_INDENT * depth + marker + " " + _md_children(child, pre, depth + 1).strip())
+                items.append(_MD_INDENT * depth + marker + " " + _md_children(child, False, depth + 1, codes).strip())
             else:
-                items.append(_md_node(child, pre, depth + 1).strip())
+                items.append(_md_node(child, False, depth + 1, codes).strip())
         sep = "\n" if depth else "\n\n"
         return sep + "\n".join(i for i in items if i) + sep
     if tag == "table":
-        return _md_table(node, depth)
-    inner = _md_children(node, pre, depth)
+        return _md_table(node, depth, codes)
+    inner = _md_children(node, False, depth, codes)
     if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
         text = " ".join(inner.split())
         return f"\n\n{'#' * int(tag[1])} {text}\n\n" if text else ""
@@ -1258,10 +1316,9 @@ def _md_node(node, pre: bool = False, depth: int = 0) -> str:
     if tag in ("div", "li", "tr", "section", "article"):
         return f"\n{inner}\n"
     if tag == "blockquote":
-        quoted = "\n".join(("> " + line) if line else ">" for line in _md_cleanup(inner).split("\n"))
+        body = _md_expand(_md_cleanup(inner), codes)  # code blocks are quoted along with the text
+        quoted = "\n".join(("> " + line) if line else ">" for line in body.split("\n"))
         return f"\n\n{quoted}\n\n"
-    if pre:  # no inline markup inside code blocks
-        return inner
     if tag in ("b", "strong"):
         return _md_wrap(inner, "**")
     if tag in ("i", "em"):
@@ -1269,21 +1326,25 @@ def _md_node(node, pre: bool = False, depth: int = 0) -> str:
     if tag in ("s", "strike", "del"):
         return _md_wrap(inner, "~~")
     if tag == "code":
-        return _md_wrap(inner, "`")
+        return _md_code_span(inner)
     if tag == "a":
         href = attrs.get("href", "").strip()
         text = " ".join(inner.split())
         if href.lower().startswith(("http://", "https://", "mailto:")):
-            return href if not text or text == href else f"[{text}]({href})"
+            if not text or text == href:
+                return href
+            return "[" + text.replace("[", "\\[").replace("]", "\\]") + f"]({href})"
     return inner
 
 def html_to_markdown(html_text: str) -> str:
     if not html_text:
         return ""
     builder = _HtmlTreeBuilder()
-    builder.feed(html_text.replace(_MD_INDENT, ""))
+    builder.feed(html_text.replace(_MD_INDENT, "").replace(_MD_CODE, ""))
     builder.close()
-    return _md_cleanup(_md_node(builder.root)).replace(_MD_INDENT, "  ")
+    codes = []
+    text = _md_cleanup(_md_node(builder.root, False, 0, codes))
+    return _md_expand(text, codes).replace(_MD_INDENT, "  ")
 
 # ── Tool argument helpers ──
 def _arg_str(args: dict, key: str, required: bool = False, max_len: int = 200) -> Optional[str]:
@@ -1378,7 +1439,7 @@ def _mcp_search_notes(user_id: int, args: dict) -> str:
         score = sum((5 if t in title_f else 0) + min(body_f.count(t), 10) for t in matched)
         if len(terms) > 1 and (phrase in title_f or phrase in " ".join(body_f.split())):
             score += 10
-        matches.append((len(matched), score, r["updated_at"] or "", r, title, body, matched))
+        matches.append((len(matched), score, r["updated_at"] or "", r, title, body, body_f, matched))
     complete = [m for m in matches if m[0] == len(terms)]
     results = complete or matches
     results.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
@@ -1392,9 +1453,9 @@ def _mcp_search_notes(user_id: int, args: dict) -> str:
     else:
         lines = [f"No note contains all the words of \"{query}\"{where}. {len(results)} note(s) contain "
                  f"some of them, best matches first (showing {len(shown)}):"]
-    for i, (_, _, _, r, title, body, matched) in enumerate(shown, 1):
+    for i, (_, _, _, r, title, body, body_f, matched) in enumerate(shown, 1):
         lines += ["", f"{i}. {title or 'Untitled'}", "   " + _mcp_note_meta(r, paths)]
-        snippet = _mcp_snippet(body, matched)
+        snippet = _mcp_snippet(body, body_f, matched)
         if snippet:
             lines.append(f"   > {snippet}")
     if len(results) > len(shown):
@@ -1606,6 +1667,12 @@ def _mcp_call_tool(params: dict, auth: dict) -> dict:
         return {"content": [{"type": "text", "text": str(e)}], "isError": True}
     return {"content": [{"type": "text", "text": text}], "isError": False}
 
+def _mcp_tools_page(params: dict) -> list:
+    # The tool list is never paginated, so any cursor is one we didn't issue
+    if params.get("cursor") not in (None, ""):
+        raise McpError(-32602, "Invalid params: invalid cursor")
+    return MCP_TOOLS
+
 def _mcp_decode_header(value: Optional[str]) -> Optional[str]:
     """Decode the =?base64?...?= form that clients use for non-ASCII header values."""
     if value is None:
@@ -1628,7 +1695,7 @@ def _mcp_legacy_dispatch(method: str, params: dict, auth: dict) -> dict:
     if method == "ping":
         return {}
     if method == "tools/list":
-        return {"tools": MCP_TOOLS}
+        return {"tools": _mcp_tools_page(params)}
     if method == "tools/call":
         return _mcp_call_tool(params, auth)
     raise McpError(-32601, f"Method not found: {method}")
@@ -1652,18 +1719,18 @@ def _mcp_modern_dispatch(method: str, params: dict, headers, version: str, auth:
         return {"resultType": "complete", "supportedVersions": list(MCP_SUPPORTED_VERSIONS),
                 "capabilities": {"tools": {}}, "instructions": MCP_INSTRUCTIONS,
                 "ttlMs": 3600000, "cacheScope": "public"}
-    if method == "tools/list":
-        return {"resultType": "complete", "tools": MCP_TOOLS, "ttlMs": 300000, "cacheScope": "public"}
-    if method == "tools/call":
-        header_name = _mcp_decode_header(headers.get("mcp-name"))
-        if header_name != params.get("name"):
-            raise McpError(-32020, f"Header mismatch: Mcp-Name header value '{header_name}' "
-                                   f"does not match body value '{params.get('name')}'", http_status=400)
-        try:
+    try:
+        if method == "tools/list":
+            return {"resultType": "complete", "tools": _mcp_tools_page(params), "ttlMs": 300000, "cacheScope": "public"}
+        if method == "tools/call":
+            header_name = _mcp_decode_header(headers.get("mcp-name"))
+            if header_name != params.get("name"):
+                raise McpError(-32020, f"Header mismatch: Mcp-Name header value '{header_name}' "
+                                       f"does not match body value '{params.get('name')}'")
             return {"resultType": "complete", **_mcp_call_tool(params, auth)}
-        except McpError as e:
-            e.http_status = 400
-            raise
+    except McpError as e:
+        e.http_status = 400  # -32602 / -32020 map to 400 in this era
+        raise
     raise McpError(-32601, f"Method not found: {method}", http_status=404)
 
 def _mcp_handle(msg: dict, headers, auth: dict):
@@ -1702,7 +1769,8 @@ def _mcp_handle(msg: dict, headers, auth: dict):
         return e.http_status, _jsonrpc_error(req_id, e.code, e.message, e.data)
     except Exception:
         mcp_logger.exception("MCP request failed (method=%s)", method)
-        return 500, _jsonrpc_error(req_id, -32603, "Internal error")
+        # HTTP 200 like the official SDK: clients then surface the JSON-RPC error for this request
+        return 200, _jsonrpc_error(req_id, -32603, "Internal error")
 
 def _mcp_authenticate(authorization: str, ip: str):
     """Return the token row (id, user_id) or an error response (401 / 429)."""
@@ -1714,14 +1782,6 @@ def _mcp_authenticate(authorization: str, ip: str):
              "error_description": "Missing token. Create a personal access token in NotesMe (MCP access) "
                                   "and send it as 'Authorization: Bearer nm_...'."},
             status_code=401, headers={"WWW-Authenticate": 'Bearer realm="notesme"'})
-    now = time.time()
-    failures = [t for t in _mcp_auth_failures.get(ip, []) if t > now - LOGIN_WINDOW_SEC]
-    if len(failures) >= MCP_AUTH_MAX_FAILURES:
-        _mcp_auth_failures[ip] = failures
-        wait = int(failures[0] + LOGIN_WINDOW_SEC - now) + 1
-        return JSONResponse({"error": "too_many_requests",
-                             "error_description": f"Too many invalid tokens. Retry in {wait}s."},
-                            status_code=429, headers={"Retry-After": str(wait)})
     row = None
     if raw.startswith(API_TOKEN_PREFIX) and len(raw) <= 100:
         db = get_db()
@@ -1736,13 +1796,27 @@ def _mcp_authenticate(authorization: str, ip: str):
                     db.commit()
         finally:
             db.close()
-    if not row:
-        failures.append(now)
-        _mcp_auth_failures[ip] = failures
-        return JSONResponse({"error": "invalid_token", "error_description": "Invalid or revoked token."},
-                            status_code=401,
-                            headers={"WWW-Authenticate": 'Bearer realm="notesme", error="invalid_token"'})
-    return {"id": row["id"], "user_id": row["user_id"]}
+    if row:
+        return {"id": row["id"], "user_id": row["user_id"]}
+    # Invalid token: throttle the IP with 429s. Checked only after a failed lookup, so valid tokens
+    # are never blocked (a misconfigured client behind the same proxy, or sharing Claude's egress IPs,
+    # can't lock the others out); tokens are 256-bit random, so brute force is not a concern anyway.
+    now = time.time()
+    failures = [t for t in _mcp_auth_failures.get(ip, []) if t > now - LOGIN_WINDOW_SEC]
+    failures = (failures + [now])[-(MCP_AUTH_MAX_FAILURES + 1):]
+    _mcp_auth_failures[ip] = failures
+    if len(_mcp_auth_failures) > 10000:  # many distinct IPs: drop the expired entries
+        for k, times in list(_mcp_auth_failures.items()):
+            if not times or times[-1] <= now - LOGIN_WINDOW_SEC:
+                _mcp_auth_failures.pop(k, None)
+    if len(failures) > MCP_AUTH_MAX_FAILURES:
+        wait = int(failures[0] + LOGIN_WINDOW_SEC - now) + 1
+        return JSONResponse({"error": "too_many_requests",
+                             "error_description": f"Too many invalid tokens. Retry in {wait}s."},
+                            status_code=429, headers={"Retry-After": str(wait)})
+    return JSONResponse({"error": "invalid_token", "error_description": "Invalid or revoked token."},
+                        status_code=401,
+                        headers={"WWW-Authenticate": 'Bearer realm="notesme", error="invalid_token"'})
 
 def _mcp_rate_limit_wait(token_id: str) -> int:
     """Seconds to wait if the token exceeded MCP_RATE_LIMIT requests in the last minute, else 0."""
@@ -1804,6 +1878,11 @@ def mcp_method_not_allowed():
     # Stateless server: no SSE stream (GET) and no session to terminate (DELETE)
     return JSONResponse({"error": "Method not allowed: this MCP endpoint only accepts POST."},
                         status_code=405, headers={"Allow": "POST"})
+
+@app.api_route("/mcp/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+def mcp_subpath_not_found():
+    # e.g. OAuth discovery probes like /mcp/.well-known/openid-configuration (not the SPA's index.html)
+    return JSONResponse({"error": "not_found"}, status_code=404)
 
 # OAuth discovery / endpoints: NotesMe only supports personal access tokens. Clean JSON 404s
 # (instead of the SPA's index.html) make MCP clients fail fast after a 401.
