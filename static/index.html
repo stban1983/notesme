@@ -269,6 +269,19 @@
         .admin-user-row .username{font-weight:600;font-size:14px}
         .admin-user-row .badge{font-size:10px;padding:3px 10px;border-radius:20px;background:var(--accent-glow);color:var(--accent-1);font-weight:700;text-transform:uppercase;letter-spacing:0.05em}
 
+        /* ═══ MCP ACCESS ═══ */
+        .modal.modal-wide{width:640px;max-width:calc(100vw - 32px)}
+        .mcp-help{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-bottom:16px}
+        .mcp-warning{font-size:13px;line-height:1.5;color:var(--text-primary);border:1px solid var(--warning);border-left-width:4px;border-radius:var(--radius-md);padding:10px 12px;margin-bottom:16px}
+        .mcp-section{margin-top:16px}
+        .mcp-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em}
+        .mcp-section-head span,.mcp-section-head .btn{text-transform:none;letter-spacing:normal;font-weight:400}
+        .mcp-code{display:block;font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--text-primary);background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;margin:0;white-space:pre;overflow-x:auto;user-select:all}
+        .token-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:8px;background:var(--bg-elevated)}
+        .token-row .token-name{font-weight:600;font-size:14px;word-break:break-word}
+        .token-row .token-meta{font-size:11px;color:var(--text-secondary);font-family:var(--mono);margin-top:2px}
+        .mcp-empty{font-size:13px;color:var(--text-tertiary);padding:4px 0 8px}
+
         /* ═══ TOAST ═══ */
         .toast-container{position:fixed;bottom:24px;right:24px;z-index:2000;display:flex;flex-direction:column;gap:8px}
         .toast{background:var(--bg-surface);color:var(--text-primary);padding:12px 20px;border-radius:var(--radius-md);font-size:13px;font-weight:500;box-shadow:var(--shadow-md);border:1px solid var(--border-active);animation:slideInRight .3s var(--tr);backdrop-filter:blur(10px);display:flex;align-items:center;gap:8px}
@@ -391,12 +404,15 @@
                 <div class="folder-item" data-folder="__trash__" onclick="selectFolder('__trash__')">
                     <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span><span class="fn">Trash</span><span class="fc" id="trashCount">0</span>
                 </div>
+                <div class="folder-item hidden" id="mcpNavItem" onclick="showMcpPanel()" title="Let Claude Desktop & other MCP clients search your notes">
+                    <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span></span><span class="fn">MCP access</span>
+                </div>
             </div>
             <div class="sidebar-footer">
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v1.3.1</div>
+					<div class="sidebar-version">v1.4.0</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -804,7 +820,7 @@ document.getElementById('loginForm').addEventListener('submit', async(e)=>{
         const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});
         if(res.status===429){const d=await res.json().catch(()=>({}));errEl.textContent=d.detail||'Too many attempts';errEl.style.display='block';return;}
         const d=await res.json();
-        if(d.token){token=d.token;localStorage.setItem('notes_token',token);showApp(d.username,d.is_admin);}
+        if(d.token){token=d.token;localStorage.setItem('notes_token',token);showApp(d.username,d.is_admin,d.mcp_enabled);}
         else{errEl.textContent='Invalid credentials';errEl.style.display='block';}
     }catch{errEl.textContent='Invalid credentials';errEl.style.display='block';}
 });
@@ -817,7 +833,7 @@ function logout(){
     }
     location.reload();
 }
-async function showApp(username,admin){
+async function showApp(username,admin,mcpEnabled){
     document.getElementById('loginOverlay').style.display='none';
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('userName').textContent=username;
@@ -825,6 +841,7 @@ async function showApp(username,admin){
     isAdmin=!!admin;
     document.getElementById('userRole').textContent=isAdmin?'Administrator':'User';
     document.getElementById('adminBtn').style.display=isAdmin?'':'none';
+    document.getElementById('mcpNavItem').classList.toggle('hidden',!mcpEnabled);
 
     // Check offline state
     setOfflineState(!navigator.onLine);
@@ -850,7 +867,7 @@ async function init(){
     if(token){
         try{
             const u=await api('/auth/me');
-            if(u){showApp(u.username,u.is_admin);return;}
+            if(u){showApp(u.username,u.is_admin,u.mcp_enabled);return;}
         }catch{
             // If we're offline and have a token, try to show the app in offline mode
             if (!navigator.onLine) {
@@ -1514,6 +1531,69 @@ async function deleteUser(id,name){
 }
 
 // ══════════════════════════════════════════
+// MCP ACCESS — personal access tokens for Claude Desktop & other MCP clients
+// ══════════════════════════════════════════
+const MCP_REMOTE_PKG='mcp-remote@0.14.3';
+function mcpEndpoint(serverUrl){return serverUrl||(location.origin+'/mcp');}
+function fmtDateTime(ds){const d=new Date(ds);return isNaN(d)?'':d.toLocaleString('en-US',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function openMcpModal(title){
+    document.getElementById('modalTitle').textContent=title;
+    document.getElementById('modalContent').classList.add('modal-wide');
+    document.getElementById('modalActions').innerHTML='<button class="btn btn-ghost" onclick="closeModal()">Close</button>';
+    document.getElementById('modalOverlay').classList.add('show');
+}
+async function showMcpPanel(){
+    if(isOffline){toast('MCP access is not available offline');return;}
+    let data;
+    try{data=await api('/tokens');}catch(e){toast('Error: '+e.message);return;}
+    if(!data)return;
+    const rows=data.tokens.map(t=>'<div class="token-row"><div><div class="token-name">'+escHtml(t.name)+'</div><div class="token-meta">'
+        +escHtml(t.prefix)+'… · created '+fmtDateTime(t.created_at)+' · '+(t.last_used_at?'last used '+fmtDateTime(t.last_used_at):'never used')+'</div></div>'
+        +'<button class="btn btn-danger btn-sm" onclick="revokeMcpToken(\''+escHtml(t.id)+'\')">Revoke</button></div>').join('');
+    document.getElementById('modalBody').innerHTML=
+        '<p class="mcp-help">Personal access tokens let an MCP client such as <b>Claude Desktop</b> search and read your notes (read-only). Anyone holding a token can read all your notes: keep it secret and revoke it when you no longer need it.</p>'
+        +'<div class="mcp-section-head">MCP endpoint</div><code class="mcp-code" id="mcpUrl"></code>'
+        +'<div class="mcp-section"><div class="mcp-section-head">Your tokens</div>'+(rows||'<div class="mcp-empty">No token yet.</div>')+'</div>'
+        +'<div class="mcp-section" style="padding-top:16px;border-top:1px solid var(--border)"><div class="form-group"><label>New token name</label><input type="text" id="mcpTokenName" maxlength="60" placeholder="e.g. Claude Desktop (laptop)"></div>'
+        +'<button class="btn btn-primary" onclick="createMcpToken()" style="width:auto;padding:10px 24px">Create token</button></div>';
+    document.getElementById('mcpUrl').textContent=mcpEndpoint(data.mcp_url);
+    document.getElementById('mcpTokenName').onkeydown=(e)=>{if(e.key==='Enter')createMcpToken();};
+    openMcpModal('MCP access');
+}
+async function createMcpToken(){
+    const name=document.getElementById('mcpTokenName').value.trim();
+    if(!name){toast('Please enter a token name');return;}
+    let t;
+    try{t=await api('/tokens',{method:'POST',body:{name}});}catch(e){toast('Error: '+e.message);return;}
+    if(!t)return;
+    const url=mcpEndpoint(t.mcp_url);
+    // Secrets are inserted with textContent only; closeModal() wipes them
+    document.getElementById('modalBody').innerHTML='<div class="mcp-warning">Copy this token now: it will not be shown again.</div>'
+        +mcpCodeBlock('Token','mcpNewToken')
+        +mcpCodeBlock('Claude Desktop <span>— add to claude_desktop_config.json (requires Node.js 20+)</span>','mcpDesktopCfg')
+        +mcpCodeBlock('Claude Code','mcpCodeCmd');
+    document.getElementById('mcpNewToken').textContent=t.token;
+    document.getElementById('mcpDesktopCfg').textContent=claudeDesktopConfig(url,t.token);
+    document.getElementById('mcpCodeCmd').textContent='claude mcp add --transport http notesme '+url+' --header "Authorization: Bearer '+t.token+'"';
+    openMcpModal('Token “'+t.name+'” created');
+    document.getElementById('modalActions').innerHTML='<button class="btn btn-primary" onclick="showMcpPanel()" style="width:auto;padding:10px 24px">Done</button>';
+}
+function mcpCodeBlock(label,id){
+    return '<div class="mcp-section"><div class="mcp-section-head"><div>'+label+'</div><button class="btn btn-ghost btn-sm" onclick="copyText(document.getElementById(\''+id+'\').textContent)">Copy</button></div><pre class="mcp-code" id="'+id+'"></pre></div>';
+}
+function claudeDesktopConfig(url,tok){
+    // mcp-remote bridges Claude Desktop (stdio) to the HTTP endpoint. The header goes through an env var
+    // without a space after the colon: Claude Desktop on Windows does not escape spaces in args.
+    const args=['-y',MCP_REMOTE_PKG,url,'--transport','http-only','--header','Authorization:${NOTESME_AUTH}'];
+    if(url.startsWith('http://'))args.push('--allow-http');
+    return JSON.stringify({mcpServers:{notesme:{command:'npx',args,env:{NOTESME_AUTH:'Bearer '+tok}}}},null,2);
+}
+async function revokeMcpToken(id){
+    if(!confirm('Revoke this token? Clients using it will immediately lose access.'))return;
+    try{await api('/tokens/'+encodeURIComponent(id),{method:'DELETE'});toast('Token revoked');showMcpPanel();}catch(e){toast('Error: '+e.message);}
+}
+
+// ══════════════════════════════════════════
 // MODAL
 // ══════════════════════════════════════════
 function showModal(title,label,value,confirmText,onConfirm){
@@ -1526,7 +1606,12 @@ function showModal(title,label,value,confirmText,onConfirm){
     document.getElementById('modalConfirm').onclick=h;
     document.getElementById('modalInput').onkeydown=(e)=>{if(e.key==='Enter')h();};
 }
-function closeModal(){document.getElementById('modalOverlay').classList.remove('show');}
+function closeModal(){
+    document.getElementById('modalOverlay').classList.remove('show');
+    // MCP panel: restore the default width and wipe any token still displayed
+    const mc=document.getElementById('modalContent');
+    if(mc.classList.contains('modal-wide')){mc.classList.remove('modal-wide');document.getElementById('modalBody').innerHTML='';}
+}
 
 // ══════════════════════════════════════════
 // SIDEBAR — mobile open/close with history sync
@@ -1606,6 +1691,11 @@ function escHtml(s){const d=document.createElement('div');d.textContent=s;return
 function formatDate(ds){if(!ds)return'';const d=new Date(ds),diff=Date.now()-d;if(diff<60000)return"Just now";if(diff<3600000)return Math.floor(diff/60000)+' min';if(diff<86400000)return Math.floor(diff/3600000)+'h';return d.toLocaleDateString('en-US',{day:'numeric',month:'short'});}
 function updateWordCount(){const t=document.getElementById('editorContent').textContent||'';const w=t.trim()?t.trim().split(/\s+/).length:0;document.getElementById('editorWordCount').textContent=w+' word'+(w!==1?'s':'');}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.getElementById('toastContainer').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(20px)';t.style.transition='all .3s ease';setTimeout(()=>t.remove(),300);},2500);}
+function copyText(text){
+    // navigator.clipboard needs a secure context (HTTPS or localhost): fall back to execCommand on plain-HTTP LAN installs
+    const fallback=()=>{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch{}ta.remove();toast(ok?'Copied':'Copy failed: select the text and press Ctrl+C');};
+    if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(text).then(()=>toast('Copied'),fallback);else fallback();
+}
 
 // Keyboard shortcuts
 document.addEventListener('keydown',(e)=>{
