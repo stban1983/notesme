@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notes-v12';
+const CACHE_NAME = 'notes-v13';
 const STATIC_ASSETS = ['/', '/manifest.json', '/static/logo.svg'];
 
 self.addEventListener('install', (event) => {
@@ -19,6 +19,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
+
+    // ── MCP endpoint: never handled by the service worker ──
+    if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) return;
 
     // ── Web Share Target ──
     if (url.pathname === '/share-target' && event.request.method === 'POST') {
@@ -68,8 +71,9 @@ self.addEventListener('fetch', (event) => {
 
     // ── API calls: network-first, fall back to cache ──
     // Exclude /api/sync — data is managed in IndexedDB, no need to double-cache
+    // Exclude /api/tokens — MCP token list must always be fresh (network only)
     if (url.pathname.startsWith('/api/')) {
-        if (url.pathname === '/api/sync') {
+        if (url.pathname === '/api/sync' || url.pathname.startsWith('/api/tokens')) {
             event.respondWith(fetch(event.request));
             return;
         }

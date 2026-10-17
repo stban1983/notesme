@@ -1,32 +1,18 @@
 # Changelog
 
-## [1.5.1] - 2026-06-10 - Markdown import
+## [1.4.0] - 2026-09-10 - MCP server (Claude Desktop)
 
-- The note list panel now widens automatically to fit long folder names instead of truncating them.
+- New, optional (`MCP_ENABLED=true`): a read-only MCP server on `/mcp`, so Claude Desktop, Claude Code or any MCP client can search and read your notes
+- 4 tools: `search_notes` (multi-word, case- and accent-insensitive), `get_note` (note converted to Markdown, checklists included), `list_notes`, `list_folders`
+- Personal access tokens per user, from the new "MCP access" sidebar entry: shown once, stored hashed, revocable
+- Ready-to-paste Claude Desktop config, with uv (`uvx mcp-proxy`) or Node.js (`npx mcp-remote`)
+- Supports MCP protocol versions 2024-11-05 to 2025-11-25 and the new 2026-07-28 revision
+- No new dependency
 
-## [1.5.0] - 2026-06-10 - Markdown import
+New environment variables: `MCP_ENABLED`, `MCP_PUBLIC_URL`, `MCP_ALLOWED_ORIGINS`, `MCP_RATE_LIMIT` (see README).
 
-### Added
-- **Import Markdown notes.** A new import button (next to "new note") lets you bring in one or more `.md` / `.markdown` files at once — each file becomes a note, named after its filename, in the currently selected folder. Markdown is converted to rich text on the fly (headings, lists, tables, task lists, code blocks, quotes, links).
-- **Image import.** Select your `.md` files together with their referenced images and they'll be uploaded and re-hosted automatically. Images matched by filename.
+Don't forget to clear your cache!
 
-### Security
-- Imported content goes through the same defenses as everything else: client-side DOMPurify, then server-side nh3 sanitization and at-rest encryption. The new `marked` Markdown library is loaded from CDN with a Subresource Integrity (SRI) hash.
-
-## [1.4.0] - 2026-06-02 - Security hardening & maintenance
-
-### Security
-- Dependencies upgraded to current releases (notably `python-multipart` 0.0.9 → 0.0.30, which fixes a known DoS advisory; also FastAPI, uvicorn, cryptography, PyJWT, argon2-cffi, nh3).
-- Subresource Integrity (SRI) hashes added to the DOMPurify and Prism CDN scripts — protects against a compromised CDN tampering with the client-side XSS sanitizer.
-- Folder/note ownership is now validated server-side: a note or sub-folder can no longer be attached to another user's folder, and folder moves that would create a cycle are rejected.
-- Path-traversal guard on image serving hardened (`commonpath` instead of prefix match).
-- Startup warnings when `SECRET_KEY`/`ENCRYPTION_KEY` are missing or the default admin password is still in use.
-
-### Changed
-- `USERNAME` environment variable renamed to `ADMIN_USERNAME` to avoid collision with the OS-provided `USERNAME` variable. `USERNAME` is still honored as a fallback, so existing setups keep working.
-
-### Internal
-- Login rate-limiter no longer grows unbounded in memory; search result sorting simplified to a single pass; dead imports removed.
 
 ## [1.3.1] - 2026-18-05 - migrate to last LTS python alpine image
 

@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(///wsl.localhost/Ubuntu-24.04/home/srozet/PERSO/notesme/static/**)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Read(///wsl.localhost/Ubuntu-24.04/home/srozet/**)",
+      "Read(///wsl.localhost/Ubuntu-24.04/home/**)",
+      "Bash(grep -E \"\\\\.\\(py|json|txt|html|js|css|sql|md\\)$\")",
+      "Read(///wsl.localhost/Ubuntu-24.04/home/srozet/PERSO/**)",
+      "Read(//c/Users/sroze/**)",
+      "Read(//mnt/c/Users/**)",
+      "Read(//c/Users//**)",
+      "Read(///wsl.localhost/ubuntu-24.04/home/srozet/**)",
+      "PowerShell(head -40)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\source\" -Force -ErrorAction SilentlyContinue | Select-Object Name, FullName)",
+      "Bash(cd \"\\\\\\\\\\\\\\\\wsl.localhost\\\\\\\\Ubuntu-24.04\\\\\\\\home\\\\\\\\srozet\\\\\\\\PERSO\\\\\\\\notesme\" 2>/dev/null; ls -la 2>/dev/null || find . -maxdepth 1 2>/dev/null | head -50)",
+      "Bash(wc -l static/*)",
+      "Bash(rm -f \"static/index.html:Zone.Identifier\")",
+      "Bash(wsl.exe -d Ubuntu-24.04 -- bash -lc ' *)",
+      "Bash(wsl.exe -d Ubuntu-24.04 -- bash -lc \"cd /home/srozet/PERSO/notesme && wc -l static/index.html && echo '--- cdnjs/script refs ---' && grep -n 'cdnjs\\\\|<script\\\\|marked\\\\|markdown\\\\|turndown\\\\|highlight\\\\|JSZip\\\\|DOMPurify' static/index.html | head -40\")",
+      "Bash(curl -s \"https://api.cdnjs.com/libraries/marked?fields=version,sri\")",
+      "Bash(curl -s \"https://api.cdnjs.com/libraries/marked/16.3.0?fields=sri\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,'=>',v\\) for k,v in d.get\\('sri',{}\\).items\\(\\) if k.endswith\\('.min.js'\\)]\")"
+    ]
+  }
+}
