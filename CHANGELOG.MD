@@ -5,6 +5,7 @@
 - New, optional (`MCP_ENABLED=true`): a read-only MCP server on `/mcp`, so Claude Desktop, Claude Code or any MCP client can search and read your notes
 - 4 tools: `search_notes` (multi-word, case- and accent-insensitive), `get_note` (note converted to Markdown, checklists included), `list_notes`, `list_folders`
 - Personal access tokens per user, from the new "MCP access" sidebar entry: shown once, stored hashed, revocable
+- Ready-to-paste Claude Desktop config, with uv (`uvx mcp-proxy`) or Node.js (`npx mcp-remote`)
 - Supports MCP protocol versions 2024-11-05 to 2025-11-25 and the new 2026-07-28 revision
 - No new dependency
 

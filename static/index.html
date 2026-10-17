@@ -1570,10 +1570,12 @@ async function createMcpToken(){
     // Secrets are inserted with textContent only; closeModal() wipes them
     document.getElementById('modalBody').innerHTML='<div class="mcp-warning">Copy this token now: it will not be shown again.</div>'
         +mcpCodeBlock('Token','mcpNewToken')
-        +mcpCodeBlock('Claude Desktop <span>— add to claude_desktop_config.json (requires Node.js 20+)</span>','mcpDesktopCfg')
+        +mcpCodeBlock('Claude Desktop <span>— add to claude_desktop_config.json (requires uv)</span>','mcpDesktopCfg')
+        +mcpCodeBlock('Claude Desktop, Node.js variant <span>— if you have Node.js 20+ instead of uv</span>','mcpDesktopNodeCfg')
         +mcpCodeBlock('Claude Code','mcpCodeCmd');
     document.getElementById('mcpNewToken').textContent=t.token;
     document.getElementById('mcpDesktopCfg').textContent=claudeDesktopConfig(url,t.token);
+    document.getElementById('mcpDesktopNodeCfg').textContent=claudeDesktopNodeConfig(url,t.token);
     document.getElementById('mcpCodeCmd').textContent='claude mcp add --transport http notesme '+url+' --header "Authorization: Bearer '+t.token+'"';
     openMcpModal('Token “'+t.name+'” created');
     document.getElementById('modalActions').innerHTML='<button class="btn btn-primary" onclick="showMcpPanel()" style="width:auto;padding:10px 24px">Done</button>';
@@ -1582,6 +1584,12 @@ function mcpCodeBlock(label,id){
     return '<div class="mcp-section"><div class="mcp-section-head"><div>'+label+'</div><button class="btn btn-ghost btn-sm" onclick="copyText(document.getElementById(\''+id+'\').textContent)">Copy</button></div><pre class="mcp-code" id="'+id+'"></pre></div>';
 }
 function claudeDesktopConfig(url,tok){
+    // mcp-proxy (Python, run by uvx) bridges Claude Desktop (stdio) to the HTTP endpoint.
+    // API_ACCESS_TOKEN is sent as "Authorization: Bearer <token>"; an env var avoids spaces in args.
+    const args=['mcp-proxy','--transport','streamablehttp',url];
+    return JSON.stringify({mcpServers:{notesme:{command:'uvx',args,env:{API_ACCESS_TOKEN:tok}}}},null,2);
+}
+function claudeDesktopNodeConfig(url,tok){
     // mcp-remote bridges Claude Desktop (stdio) to the HTTP endpoint. The header goes through an env var
     // without a space after the colon: Claude Desktop on Windows does not escape spaces in args.
     const args=['-y',MCP_REMOTE_PKG,url,'--transport','http-only','--header','Authorization:${NOTESME_AUTH}'];
