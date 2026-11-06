@@ -348,10 +348,10 @@
         body.is-offline .app-layout{padding-top:40px}
         .offline-readonly-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:rgba(255,212,59,0.15);color:var(--warning);margin-left:8px}
     </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.17/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>window.Prism=window.Prism||{};Prism.manual=true;</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/prism.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <!-- ═══ LOGIN ═══ -->
@@ -1715,8 +1715,34 @@ document.addEventListener('keydown',(e)=>{
 window.addEventListener('beforeunload',(e)=>{if(!isOffline&&saveTimeout&&currentNote){clearTimeout(saveTimeout);saveTimeout=null;const editor=document.getElementById('editorContent');const xhr=new XMLHttpRequest();xhr.open('PUT','/api/notes/'+currentNote.id,false);xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('Authorization','Bearer '+token);xhr.send(JSON.stringify({title:document.getElementById('editorTitle').value||'Untitled',content:editor.innerHTML}));}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&saveTimeout)flushSave();});
 
-// PWA
-if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+// PWA + automatic update
+// A new release changes sw.js (the server stamps it with a build id): the new service worker
+// takes control (skipWaiting + clients.claim) and fires 'controllerchange'. The page then reloads
+// itself, but only at a safe moment: no pending save, no open modal, no typing for a few seconds.
+if('serviceWorker' in navigator){
+    const swHadController=!!navigator.serviceWorker.controller; // false on first install: no reload
+    let swUpdatePending=false, swReloading=false, swLastActivity=Date.now();
+    ['keydown','pointerdown','input','paste'].forEach(ev=>document.addEventListener(ev,()=>{swLastActivity=Date.now();},true));
+    const swSafeToReload=()=>{
+        if(saveTimeout)return false;
+        if(document.getElementById('modalOverlay')?.classList.contains('show'))return false;
+        return document.hidden||Date.now()-swLastActivity>=5000;
+    };
+    const swTryReload=async()=>{
+        if(!swUpdatePending||swReloading||!swSafeToReload())return;
+        swReloading=true;
+        try{await flushSave();}catch(e){}
+        location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!swHadController)return;swUpdatePending=true;swTryReload();});
+    setInterval(swTryReload,2000);
+    navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(reg=>{
+        // Long-lived tabs / installed PWA: look for a new release on return and every 30 min
+        const swCheck=()=>{if(!isOffline&&navigator.onLine)reg.update().catch(()=>{});};
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden)swCheck();});
+        setInterval(swCheck,30*60*1000);
+    }).catch(()=>{});
+}
 
 // ── Periodic offline sync (every 5 minutes when online) ──
 setInterval(() => { if (!isOffline && token) syncOfflineData(); }, 5 * 60 * 1000);
@@ -1728,7 +1754,7 @@ history.replaceState({ view: 'list' }, '', location.pathname + location.search);
 
 // ── Prism autoloader config ──
 if(typeof Prism!=='undefined'&&Prism.plugins&&Prism.plugins.autoloader){
-    Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+    Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/components/';
 }
 // ── Search highlight inside editor ──
 function highlightSearchInEditor(){

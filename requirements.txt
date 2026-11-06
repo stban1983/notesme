@@ -1,7 +1,7 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-python-multipart==0.0.9
-PyJWT==2.9.0
-cryptography==43.0.0
-argon2-cffi==23.1.0
-nh3==0.2.21
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.33
+PyJWT==2.15.1
+cryptography==50.0.2
+argon2-cffi==25.1.0
+nh3==0.3.7

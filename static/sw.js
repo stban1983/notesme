@@ -1,9 +1,14 @@
-const CACHE_NAME = 'notes-v13';
+// The build id below is filled in by the server (version + hash of the frontend): every release
+// gives a new cache name, so the new service worker installs and open pages reload.
+const CACHE_NAME = 'notes-__BUILD_ID__';
 const STATIC_ASSETS = ['/', '/manifest.json', '/static/logo.svg'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+        // cache: 'reload' bypasses the HTTP cache, so the new shell is really the new one
+        caches.open(CACHE_NAME).then((cache) =>
+            cache.addAll(STATIC_ASSETS.map((u) => new Request(u, { cache: 'reload' })))
+        )
     );
     self.skipWaiting();
 });
@@ -89,10 +94,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Network-first for HTML pages
+    // Network-first for HTML pages, always revalidated with the server (never a stale HTTP cache)
     if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+        const fresh = event.request.method === 'GET'
+            ? new Request(event.request.url, { cache: 'no-cache', credentials: 'same-origin' })
+            : event.request;
         event.respondWith(
-            fetch(event.request).then((response) => {
+            fetch(fresh).then((response) => {
                 if (response.ok) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));

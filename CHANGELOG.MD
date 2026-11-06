@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased] - No more hard refresh after an update
+
+- The app now updates itself: after a new release, open pages reload automatically (once no save is pending, no dialog is open and you have stopped typing for a few seconds)
+- index.html, sw.js and manifest.json are served with `Cache-Control: no-cache`
+- The service worker cache name is generated from the version and the frontend content: no manual bump anymore
+
+Note: the first update to this version may still need one last Ctrl+F5.
+
+
+## [1.4.1] - 2026-06-11 - Dependencies and images update
+
+- Docker image: python:3.13-alpine to python:3.14-alpine
+- Python deps: fastapi 0.162.0, uvicorn 0.54.0, python-multipart 0.0.33, PyJWT 2.15.1, cryptography 50.0.2, argon2-cffi 25.1.0, nh3 0.3.7
+- Frontend libs: DOMPurify 3.4.17, Prism 1.30.0 (fixes CVE-2024-53382)
+- GitHub Actions: checkout v7, setup-qemu v4, setup-buildx v4, login v4, metadata v6, build-push v7
+- No new feature
+
+Don't forget to clear your cache!
+
+
 ## [1.4.0] - 2026-09-10 - MCP server (Claude Desktop)
 
 - New, optional (`MCP_ENABLED=true`): a read-only MCP server on `/mcp`, so Claude Desktop, Claude Code or any MCP client can search and read your notes
