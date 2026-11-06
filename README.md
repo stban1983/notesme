@@ -346,11 +346,11 @@ data/
 
 | Component | Technology |
 |---|---|
-| Backend | Python 3.12, FastAPI, SQLite (WAL mode), Fernet, Argon2 |
+| Backend | Python 3.14, FastAPI, SQLite (WAL mode), Fernet, Argon2 |
 | Frontend | Vanilla JS, HTML/CSS — zero frameworks, zero bundlers |
 | Sanitization | DOMPurify (CDN) |
 | Auth | JWT (PyJWT) |
-| Container | `python:3.12-slim` (~90 MB) |
+| Container | `python:3.14-alpine` |
 | PWA | Service Worker + manifest.json |
 
 ---
@@ -369,8 +369,8 @@ data/
 
 ---
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)

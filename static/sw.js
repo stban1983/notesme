@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notes-v13';
+const CACHE_NAME = 'notes-v14';
 const STATIC_ASSETS = ['/', '/manifest.json', '/static/logo.svg'];
 
 self.addEventListener('install', (event) => {

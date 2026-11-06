@@ -50,7 +50,7 @@ TRASH_RETENTION_DAYS = int(os.environ.get("TRASH_RETENTION_DAYS", "30"))
 VERSION_INTERVAL_MIN = int(os.environ.get("VERSION_INTERVAL_MIN", "5"))
 MAX_VERSIONS_PER_NOTE = int(os.environ.get("MAX_VERSIONS_PER_NOTE", "50"))
 MAX_UPLOAD_SIZE = int(os.environ.get("MAX_UPLOAD_SIZE", str(10 * 1024 * 1024)))  # 10 MB
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 
 # ─── MCP server (optional, read-only access to notes for Claude Desktop & other MCP clients) ───
 MCP_ENABLED = os.environ.get("MCP_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
