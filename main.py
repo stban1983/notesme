@@ -1898,14 +1898,35 @@ def oauth_not_supported():
 # ─── Serve Frontend ───
 app.mount("/static", StaticFiles(directory="/app/static"), name="static")
 
+# The app shell (index.html, sw.js, manifest) must always be revalidated by the browser,
+# otherwise a new release is only picked up after a hard refresh (Ctrl+F5).
+NO_CACHE_HEADERS = {"Cache-Control": "no-cache"}
+
+# Service worker script with its cache name tied to the current build: any change to the
+# frontend (or a version bump) changes sw.js, so the browser installs the new service worker
+# and open pages reload themselves (see "PWA" in index.html). No manual cache bump needed.
+_SW_PATH = Path("/app/static/sw.js")
+_INDEX_PATH = Path("/app/static/index.html")
+_sw_cache = {"key": None, "body": b""}
+
+def _service_worker_body() -> bytes:
+    key = (_SW_PATH.stat().st_mtime_ns, _INDEX_PATH.stat().st_mtime_ns)
+    if _sw_cache["key"] != key:
+        sw = _SW_PATH.read_bytes()
+        digest = hashlib.sha256(sw + _INDEX_PATH.read_bytes()).hexdigest()[:10]
+        build_id = f"{APP_VERSION}-{digest}".encode()
+        _sw_cache["body"] = sw.replace(b"__BUILD_ID__", build_id)
+        _sw_cache["key"] = key
+    return _sw_cache["body"]
+
 @app.get("/manifest.json")
 def manifest():
-    return FileResponse("/app/static/manifest.json")
+    return FileResponse("/app/static/manifest.json", headers=NO_CACHE_HEADERS)
 
 @app.get("/sw.js")
 def service_worker():
-    return FileResponse("/app/static/sw.js", media_type="application/javascript")
+    return Response(_service_worker_body(), media_type="application/javascript", headers=NO_CACHE_HEADERS)
 
 @app.get("/{full_path:path}")
 def serve_frontend(full_path: str):
-    return FileResponse("/app/static/index.html")
+    return FileResponse("/app/static/index.html", headers=NO_CACHE_HEADERS)

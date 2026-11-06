@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased] - No more hard refresh after an update
+
+- The app now updates itself: after a new release, open pages reload automatically (once no save is pending, no dialog is open and you have stopped typing for a few seconds)
+- index.html, sw.js and manifest.json are served with `Cache-Control: no-cache`
+- The service worker cache name is generated from the version and the frontend content: no manual bump anymore
+
+Note: the first update to this version may still need one last Ctrl+F5.
+
+
 ## [1.4.1] - 2026-06-11 - Dependencies and images update
 
 - Docker image: python:3.13-alpine to python:3.14-alpine

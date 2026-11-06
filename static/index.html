@@ -1715,8 +1715,34 @@ document.addEventListener('keydown',(e)=>{
 window.addEventListener('beforeunload',(e)=>{if(!isOffline&&saveTimeout&&currentNote){clearTimeout(saveTimeout);saveTimeout=null;const editor=document.getElementById('editorContent');const xhr=new XMLHttpRequest();xhr.open('PUT','/api/notes/'+currentNote.id,false);xhr.setRequestHeader('Content-Type','application/json');xhr.setRequestHeader('Authorization','Bearer '+token);xhr.send(JSON.stringify({title:document.getElementById('editorTitle').value||'Untitled',content:editor.innerHTML}));}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&saveTimeout)flushSave();});
 
-// PWA
-if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+// PWA + automatic update
+// A new release changes sw.js (the server stamps it with a build id): the new service worker
+// takes control (skipWaiting + clients.claim) and fires 'controllerchange'. The page then reloads
+// itself, but only at a safe moment: no pending save, no open modal, no typing for a few seconds.
+if('serviceWorker' in navigator){
+    const swHadController=!!navigator.serviceWorker.controller; // false on first install: no reload
+    let swUpdatePending=false, swReloading=false, swLastActivity=Date.now();
+    ['keydown','pointerdown','input','paste'].forEach(ev=>document.addEventListener(ev,()=>{swLastActivity=Date.now();},true));
+    const swSafeToReload=()=>{
+        if(saveTimeout)return false;
+        if(document.getElementById('modalOverlay')?.classList.contains('show'))return false;
+        return document.hidden||Date.now()-swLastActivity>=5000;
+    };
+    const swTryReload=async()=>{
+        if(!swUpdatePending||swReloading||!swSafeToReload())return;
+        swReloading=true;
+        try{await flushSave();}catch(e){}
+        location.reload();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!swHadController)return;swUpdatePending=true;swTryReload();});
+    setInterval(swTryReload,2000);
+    navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(reg=>{
+        // Long-lived tabs / installed PWA: look for a new release on return and every 30 min
+        const swCheck=()=>{if(!isOffline&&navigator.onLine)reg.update().catch(()=>{});};
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden)swCheck();});
+        setInterval(swCheck,30*60*1000);
+    }).catch(()=>{});
+}
 
 // ── Periodic offline sync (every 5 minutes when online) ──
 setInterval(() => { if (!isOffline && token) syncOfflineData(); }, 5 * 60 * 1000);
