@@ -8,6 +8,19 @@
 
 Note: the first update to this version may still need one last Ctrl+F5.
 
+### Sidebar reorganized
+- New **System** section grouping **Import notes**, **Users** (admins only) and **MCP access** (when enabled). The Users button left the sidebar header.
+- **Trash** now sits at the end of the notes tree, right after the folders.
+
+### Fixed
+- **Markdown import is back.** It had been lost in the merge of the MCP branch (with the `marked` library and the auto-widening of the note list). It now opens from System → Import notes, with a destination folder picker (defaults to the current folder).
+- **1.4.0 security hardening restored.** The same merge had also dropped these backend fixes; they are back:
+  - a note or folder can no longer be attached to another user's folder, and folder moves that would create a cycle are rejected;
+  - image serving path-traversal guard uses `commonpath` instead of a prefix match;
+  - the login rate-limiter no longer grows unbounded in memory;
+  - startup warnings when `SECRET_KEY`/`ENCRYPTION_KEY` are missing or the default admin password is used;
+  - `ADMIN_USERNAME` is the preferred variable again (`USERNAME` still honored as a fallback).
+
 
 ## [1.4.1] - 2026-06-11 - Dependencies and images update
 
