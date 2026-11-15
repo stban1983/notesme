@@ -161,8 +161,8 @@
 
         /* ═══ NOTE LIST ═══ */
         .note-list-panel{width:var(--notelist-w);min-width:var(--notelist-w);border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-base)}
-        .note-list-header{padding:24px 20px 16px;display:flex;align-items:center;justify-content:space-between}
-        .note-list-header h3{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+        .note-list-header{padding:24px 20px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+        .note-list-header h3{font-size:18px;font-weight:700;letter-spacing:-0.02em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .note-list{flex:1;overflow-y:auto;padding:0 10px 10px}
         .note-card{padding:14px 16px;border-radius:var(--radius-md);cursor:pointer;transition:all var(--tr);margin-bottom:4px;border:1px solid transparent;position:relative}
         .note-card:hover{background:var(--bg-surface);border-color:var(--border)}
@@ -346,12 +346,16 @@
         .offline-banner .i{font-size:16px}
         .offline-banner .offline-sync-info{font-size:11px;font-weight:400;color:var(--text-secondary);margin-left:4px}
         body.is-offline .app-layout{padding-top:40px}
+        body.is-offline .needs-online{display:none!important}
+        .import-help{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-bottom:16px}
+        .import-help code{font-family:var(--mono);font-size:12px;background:var(--bg-elevated);padding:1px 5px;border-radius:4px}
         .offline-readonly-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:rgba(255,212,59,0.15);color:var(--warning);margin-left:8px}
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.17/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>window.Prism=window.Prism||{};Prism.manual=true;</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/prism.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.30.0/plugins/autoloader/prism-autoloader.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/16.3.0/lib/marked.umd.min.js" integrity="sha512-V6rGY7jjOEUc7q5Ews8mMlretz1Vn2wLdMW/qgABLWunzsLfluM0FwHuGjGQ1lc8jO5vGpGIGFE+rTzB+63HdA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <!-- ═══ LOGIN ═══ -->
@@ -384,7 +388,6 @@
                 </div>
                 <div style="display:flex;gap:2px">
                     <button class="btn-icon" id="themeToggle" title="Theme"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 009 9 9 9 0 11-9-9z"/></svg></span></button>
-                    <button class="btn-icon" id="adminBtn" title="Users" style="display:none" onclick="showAdminPanel()"><span class="i"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span></button>
                 </div>
             </div>
             <div class="search-box">
@@ -400,11 +403,17 @@
                 </div>
                 <div class="sidebar-section">Folders<button class="btn-icon" onclick="createFolder()" style="width:24px;height:24px;font-size:14px" title="New folder"><span class="i"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button></div>
                 <div id="foldersContainer"></div>
-                <div class="sidebar-section" style="margin-top:12px">System</div>
-                <div class="folder-item" data-folder="__trash__" onclick="selectFolder('__trash__')">
+                <div class="folder-item" data-folder="__trash__" onclick="selectFolder('__trash__')" style="margin-top:4px">
                     <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span></span><span class="fn">Trash</span><span class="fc" id="trashCount">0</span>
                 </div>
-                <div class="folder-item hidden" id="mcpNavItem" onclick="showMcpPanel()" title="Let Claude Desktop & other MCP clients search your notes">
+                <div class="sidebar-section needs-online" style="margin-top:12px">System</div>
+                <div class="folder-item needs-online" id="importNavItem" onclick="showImportPanel()" title="Import Markdown files (.md + images) as notes">
+                    <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,9 12,4 17,9"/><line x1="12" y1="4" x2="12" y2="16"/></svg></span></span><span class="fn">Import notes</span>
+                </div>
+                <div class="folder-item needs-online hidden" id="adminNavItem" onclick="showAdminPanel()" title="Create and delete user accounts">
+                    <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span></span><span class="fn">Users</span>
+                </div>
+                <div class="folder-item needs-online hidden" id="mcpNavItem" onclick="showMcpPanel()" title="Let Claude Desktop & other MCP clients search your notes">
                     <span class="fi"><span class="i"><svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span></span><span class="fn">MCP access</span>
                 </div>
             </div>
@@ -412,7 +421,7 @@
                 <div class="user-info">
                     <div class="user-avatar" id="userAvatar">A</div>
                     <div><div class="user-name" id="userName">admin</div><div class="user-role" id="userRole">Administrator</div></div>
-					<div class="sidebar-version">v2.0.0</div>
+					<div class="sidebar-version">v2.1.0</div>
                 </div>
                 <button class="btn-icon" onclick="logout()" title="Log out"><span class="i"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span></button>
             </div>
@@ -421,11 +430,11 @@
         <!-- Note list -->
         <div class="note-list-panel">
             <div class="note-list-header">
-                <div style="display:flex;align-items:center;gap:30px">
+                <div style="display:flex;align-items:center;gap:30px;flex:1;min-width:0">
                     <button class="btn-icon mobile-menu-btn" onclick="toggleSidebar()"><span class="i"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span></button>
                     <h3 id="currentFolderName">All notes</h3>
                 </div>
-                <div style="display:flex;align-items:center;gap:14px">
+                <div style="display:flex;align-items:center;gap:14px;flex-shrink:0">
                     <div class="sort-wrapper">
                         <button class="sort-btn" onclick="toggleSortMenu()" title="Sort notes">
                             <span class="i"><svg viewBox="0 0 24 24"><path d="M3 6h7"/><path d="M3 12h10"/><path d="M3 18h5"/><path d="M18 20V4"/><polyline points="15,7 18,4 21,7"/></svg></span>
@@ -513,6 +522,7 @@
     </div>
 
     <!-- Modal -->
+    <input type="file" id="mdImportInput" accept=".md,.markdown,text/markdown,image/*" multiple hidden>
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal" id="modalContent">
             <h3 id="modalTitle">Title</h3>
@@ -840,7 +850,7 @@ async function showApp(username,admin,mcpEnabled){
     document.getElementById('userAvatar').textContent=username[0].toUpperCase();
     isAdmin=!!admin;
     document.getElementById('userRole').textContent=isAdmin?'Administrator':'User';
-    document.getElementById('adminBtn').style.display=isAdmin?'':'none';
+    document.getElementById('adminNavItem').classList.toggle('hidden',!isAdmin);
     document.getElementById('mcpNavItem').classList.toggle('hidden',!mcpEnabled);
 
     // Check offline state
@@ -1488,9 +1498,26 @@ function selectFolder(id){
     document.querySelectorAll('.folder-item').forEach(el=>el.classList.toggle('active',el.dataset.folder===id));
     const names={'__all__':'All notes','__none__':'Uncategorized','__trash__':'Trash'};
     document.getElementById('currentFolderName').textContent=names[id]||(folders.find(f=>f.id===id)||{}).name||'Notes';
-    closeSidebarUI();   // close sidebar on mobile without touching history (sidebar was opened → user taps folder → no history entry for sidebar)
+    adjustNoteListWidth();
+    closeSidebarUI();  // close sidebar on mobile without touching history (sidebar was opened → user taps folder → no history entry for sidebar)
     loadNotes();showEditorEmpty();
 }
+// Widen the note-list panel just enough to fit a long folder title instead of clipping it.
+// Bounded at half the viewport; beyond that the title falls back to the ellipsis (CSS).
+function adjustNoteListWidth(){
+    const panel=document.querySelector('.note-list-panel');
+    const h3=document.getElementById('currentFolderName');
+    if(!panel||!h3)return;
+    panel.style.width='';panel.style.minWidth='';        // reset to CSS default before measuring
+    if(window.innerWidth<=900)return;                    // mobile: panel is full-width, leave it
+    const overflow=h3.scrollWidth-h3.clientWidth;        // scrollWidth = full title even while clipped
+    if(overflow>1){
+        const base=panel.getBoundingClientRect().width;  // CSS default (~320px)
+        const target=Math.min(base+overflow+2,Math.round(window.innerWidth*0.5));
+        if(target>base){panel.style.width=target+'px';panel.style.minWidth=target+'px';}
+    }
+}
+window.addEventListener('resize',adjustNoteListWidth);
 function updateFolderSelect(){
     const s=document.getElementById('noteFolderSelect');
     s.innerHTML='<option value="">Uncategorized</option>'+folders.map(f=>'<option value="'+f.id+'">'+escHtml(f.name)+'</option>').join('');
@@ -1502,6 +1529,94 @@ document.addEventListener('click',()=>document.getElementById('contextMenu').cla
 function contextRename(){if(!contextTarget||isOffline)return;showModal('Rename','New name',contextTarget.name,'Rename',async(n)=>{if(n.trim()){await api('/folders/'+contextTarget.id,{method:'PUT',body:{name:n.trim()}});await loadFolders();toast('Folder renamed');}});}
 function contextCreateSub(){if(!contextTarget||isOffline)return;createFolder(contextTarget.id);}
 async function contextDelete(){if(!contextTarget||isOffline||!confirm('Delete "'+contextTarget.name+'" ?'))return;await api('/folders/'+contextTarget.id,{method:'DELETE'});if(currentFolder===contextTarget.id)selectFolder('__all__');await loadFolders();await loadNotes();await loadStats();toast('Folder deleted');}
+
+// ══════════════════════════════════════════
+// IMPORT (Markdown files → notes)
+// ══════════════════════════════════════════
+// Folder <option>s in tree order, indented by depth
+function folderTreeOptions(selectedId){
+    let out='<option value="">Uncategorized</option>';
+    const walk=(parentId,depth)=>folders.filter(f=>(f.parent_id||null)===parentId).forEach(f=>{
+        out+='<option value="'+escHtml(f.id)+'"'+(f.id===selectedId?' selected':'')+'>'+'   '.repeat(depth)+escHtml(f.name)+'</option>';
+        walk(f.id,depth+1);
+    });
+    walk(null,0);
+    return out;
+}
+function showImportPanel(){
+    if(isOffline){toast('Offline — read only');return;}
+    const isRealFolder=currentFolder!=='__all__'&&currentFolder!=='__none__'&&currentFolder!=='__trash__';
+    document.getElementById('modalTitle').textContent='Import notes';
+    document.getElementById('modalBody').innerHTML=
+        '<p class="import-help">Select one or more Markdown files (<code>.md</code>). Each file becomes a note named after the file. '
+        +'To keep images, select them together with the Markdown files: they are matched by filename and uploaded.</p>'
+        +'<div class="form-group"><label>Destination folder</label><select id="importFolderSelect">'+folderTreeOptions(isRealFolder?currentFolder:null)+'</select></div>';
+    document.getElementById('modalActions').innerHTML='<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
+        +'<button class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="document.getElementById(\'mdImportInput\').click()">Choose files…</button>';
+    document.getElementById('modalOverlay').classList.add('show');
+}
+document.getElementById('mdImportInput').addEventListener('change',async(e)=>{
+    const files=Array.from(e.target.files||[]);
+    e.target.value='';
+    if(!files.length)return;
+    const sel=document.getElementById('importFolderSelect');
+    const fid=sel&&sel.value?sel.value:null;
+    closeModal();closeSidebarUI();
+    await importMarkdownFiles(files,fid);
+});
+async function importMarkdownFiles(files,fid){
+    if(isOffline){toast('Offline — read only');return;}
+    if(typeof marked==='undefined'){toast('Markdown library unavailable');return;}
+    const mdFiles=files.filter(f=>/\.(md|markdown)$/i.test(f.name));
+    if(!mdFiles.length){toast('Select at least one .md file');return;}
+    // Index images chosen alongside the notes, keyed by lowercased filename (basename match)
+    const imageFiles={};
+    for(const f of files){if(f.type.startsWith('image/'))imageFiles[f.name.toLowerCase()]=f;}
+    toast('Importing '+mdFiles.length+' file'+(mdFiles.length>1?'s':'')+'…');
+    let ok=0,fail=0;
+    for(const file of mdFiles){
+        try{
+            const title=file.name.replace(/\.(md|markdown)$/i,'').trim()||'Untitled';
+            // marked → HTML, then DOMPurify (the server re-sanitizes + encrypts on save)
+            const clientHtml=sanitize(marked.parse(await file.text()));
+            const note=await api('/notes',{method:'POST',body:{title,content:clientHtml,folder_id:fid}});
+            if(!note){fail++;continue;}
+            const finalHtml=await rehostImportedImages(note.id,clientHtml,imageFiles);
+            if(finalHtml!==null)await api('/notes/'+note.id,{method:'PUT',body:{content:finalHtml}});
+            ok++;
+        }catch(err){console.error('Import failed:',file.name,err);fail++;}
+    }
+    await loadFolders();await loadNotes();await loadStats();
+    toast(ok+' note'+(ok!==1?'s':'')+' imported'+(fail?' • '+fail+' failed':''));
+}
+// Upload local images referenced by an imported note (matched by filename) and rewrite
+// their src to the same-origin /api/images URL (CSP-safe). Returns rewritten HTML, or null
+// if nothing was rehosted. Matching is done against the client HTML, which still holds the
+// original relative paths regardless of how nh3 normalises them server-side.
+async function rehostImportedImages(noteId,html,imageFiles){
+    if(!Object.keys(imageFiles).length)return null;
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const uploaded={};
+    let changed=false;
+    for(const img of doc.querySelectorAll('img')){
+        const src=img.getAttribute('src')||'';
+        if(/^(https?:|data:|blob:)/i.test(src))continue; // keep absolute/inline images as-is
+        let base;
+        try{base=decodeURIComponent(src.split(/[?#]/)[0].split('/').pop()||'').toLowerCase();}catch{continue;}
+        if(!base)continue;
+        let url=uploaded[base];
+        if(url===undefined){
+            const f=imageFiles[base];
+            if(!f){uploaded[base]=null;continue;} // referenced image not in the selection
+            const form=new FormData();form.append('file',f);
+            try{const res=await api('/notes/'+noteId+'/images',{method:'POST',body:form});url=res&&res.url?res.url:null;}
+            catch{url=null;}
+            uploaded[base]=url;
+        }
+        if(url){img.setAttribute('src',url);changed=true;}
+    }
+    return changed?sanitize(doc.body.innerHTML):null;
+}
 
 // ══════════════════════════════════════════
 // ADMIN
