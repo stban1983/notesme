@@ -32,7 +32,7 @@ Read on for all the details and features!
 
 🎉 You want to test NotesMe right now ? You can jump to the demo site:
 
-https://notesme.demo-portal.eu/
+[https://notesme.demo-portal.eu/](https://demo.notesme.cloud/)
 
 User: demo
 
